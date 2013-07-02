@@ -102,29 +102,21 @@ def search( index, string ):
         searcher - whoosh searcher object
         string - whoosh index
     Output:
-        best_matches - matches for the search, ordered
+        best_match - best match for the search, or None of no match
     '''
     searcher = index.searcher()
     q = whoosh.qparser.MultifieldParser(['title', 'artist'], index.schema).parse(unicode(string, encoding='utf-8'))
     results = searcher.search(q)
     if len(results) > 0:
-        best_matches = [[r['track_id'], r['song_id'], r['artist'], r['title']] for r in results]
-        return best_matches
+        r = results[0]
+        return [r['track_id'], r['song_id'], r['artist'], r['title']]
     else:
         return None
 
 # <codecell>
 
-index = get_whoosh_index('whoosh_index')
-import pprint
-pprint.pprint( search( index, 'thunderstruck' ) )
-
-# <codecell>
-
-index.
-
-# <codecell>
-
 if __name__=='__main__':
     createIndex( 'whoosh_index', 'unique_tracks.txt' )
+    index = get_whoosh_index('whoosh_index')
+    print search( index, 'ace of base/the sign' )
 
