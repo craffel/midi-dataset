@@ -116,7 +116,7 @@ def search( index, string ):
 # <codecell>
 
 if __name__=='__main__':
-    createIndex( 'whoosh_index', 'unique_tracks.txt' )
-    index = get_whoosh_index('whoosh_index')
+    #createIndex( 'whoosh_index', 'unique_tracks.txt' )
+    #index = get_whoosh_index('whoosh_index')
     print search( index, 'ace of base/the sign' )
 
