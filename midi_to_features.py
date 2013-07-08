@@ -11,7 +11,7 @@ import string
 
 # <codecell>
 
-def get_onsets( MIDIData ):
+def get_onsets( MIDIFile ):
     '''
     Given a midi.Pattern, extract onset locations and their velocities
     
@@ -76,8 +76,13 @@ def onsets_to_strength( onsets, velocities ):
     # Define a sampling rate for the signal
     fs = 1000
     # Create an empty signal
-    onset_strength = np.zeros( fs*onsets.max() )
-    # Fill in onset values
+    onset_strength = np.zeros( int(fs*onsets.max()) +1 )
+    
+    # Convert to samples, fill in onset values
+    onsets_in_sample = onsets * fs
+    for i in range(len(onsets_in_sample)):
+        samp_pos = int(onsets_in_sample[i])
+        onset_strength[samp_pos] = velocities[i]
     
     return onset_strength, fs
 
