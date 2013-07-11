@@ -18,8 +18,9 @@ def get_onsets_and_notes( MIDIData ):
     Input:
         MIDIData - midi.Pattern object, via midi.read_midifile( MIDIFile )
     Output:
-        onsets - onset times, in seconds
-        velocities - velocity of each onset time
+        noteMatrix - a matrix containing the velocity of the notes as a piano roll
+        onset_strength - onset strength function
+        fs - sampling rate of the onset strength function
     '''
     # Array for holding onset locations (in seconds)
     onsets = np.array([])
