@@ -8,6 +8,7 @@ import numpy as np
 import os
 import random
 import string
+import librosa
 
 # <codecell>
 
@@ -69,12 +70,13 @@ def get_onsets_and_notes( MIDIData ):
     for i in range(len(onsets_in_sample)):
         samp_pos = int(onsets_in_sample[i])
         onset_strength[samp_pos] = velocities[i]
+   
+        
+    # Get beats
+    bpm,beats = librosa.beat.beat_track(onsets = onset_strength)
     
-    # get notes
-    # Array for holding notes (1-127)
+    # Get notes
     noteMatrix = np.zeros((128,len(onset_strength)+2*fs))  
-    print (len(onset_strength))
-    
     for track in MIDIData:
         time = 0
         for event in track:
@@ -85,23 +87,54 @@ def get_onsets_and_notes( MIDIData ):
             if event.name == 'Note On' and event.channel != 9 and event.velocity > 0:
                 index = int(time * fs)
                 noteMatrix[event.pitch][index:] = event.velocity
-                #print '[' + str(event.pitch) + ']' + '[' + str(index) + ']' + ':' + str(event.velocity)
          
             if event.name == 'Note Off' and event.channel != 9:
                 index = int(time * fs)
                 noteMatrix[event.pitch][index:] = 0
-                #print '[' + str(event.pitch) + ']' + '[' + str(index) + ']' + ':' + str(event.velocity)
             
             if event.name == 'Note On' and event.channel != 9 and event.velocity == 0:
                 index = int(time * fs)
                 noteMatrix[event.pitch][index:] = 0
             
-    return noteMatrix, onset_strength, fs
+    return noteMatrix, bpm, beats, fs
 
+
+# <codecell>
+
+def get_beat_chroma(noteMatrix,beats) :
+    '''
+    Given a midi note spectrum and beats, extract beat-synchronized chromagram
+    
+    Input:
+        noteMatrix - a 12 by n matrix representing the note distribution in the midi
+        beats      - beats detected by librosa's beat tracker
+    Output:
+        beatChroma - a matrix representing beat-synchronized chromagram
+    '''
+    # Fold into one octave
+    chroma_matrix = np.zeros((12,noteMatrix.shape[1]))
+    for note in range(12):
+        chroma_matrix[note,:] = np.sum([noteMatrix[12*0+note,:], noteMatrix[12*1+note,:], noteMatrix[12*2+note,:],
+                                        noteMatrix[12*3+note,:], noteMatrix[12*4+note,:], noteMatrix[12*5+note,:],
+                                        noteMatrix[12*6+note,:], noteMatrix[12*7+note,:], noteMatrix[12*8+note,:],
+                                        noteMatrix[12*9+note,:] ], axis=0)
+    
+        
+    # Get beat-synchronized chroma matrix by taking the mean across each beat
+    beatChroma = np.zeros((12,len(beats)+1))
+    beatChroma[:,0] = np.mean(chroma_matrix[:,0:beats[0]-1],1)
+    for i in range(len(beats)-1):
+        beatChroma[:,i] = np.mean(chroma_matrix[:,beats[i]:beats[i+1]-1],1)
+        # normalize??
+    beatChroma[:,-1] = np.mean(chroma_matrix[:,beats[i+1]:-1],1)
+    
+    return beatChroma
+    
 
 # <codecell>
 
 if __name__=='__main__':
     print 'midi.read_midifile(MIDIFile)'
     print 'get_onsets_and_notes(MIDIData)'
+    print 'get_beat_chroma(noteMatrix,beats)'
 
