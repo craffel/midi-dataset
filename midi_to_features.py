@@ -11,7 +11,7 @@ import string
 
 # <codecell>
 
-def get_onsets( MIDIData ):
+def get_onsets_and_notes( MIDIData ):
     '''
     Given a midi.Pattern, extract onset locations and their velocities
     
@@ -25,7 +25,6 @@ def get_onsets( MIDIData ):
     onsets = np.array([])
     # Array for velocities too
     velocities = np.array([])
-    # Scale for MIDI tick numbers, to convert to seconds
     tickScale = 1
     foundTempo = 0
     # Find the tempo setting message
@@ -42,6 +41,7 @@ def get_onsets( MIDIData ):
     if np.isnan( tickScale ):
         print "Warning: No tempo found."
         tickScale = 1
+        
     # Iterate through tracks and events
     for track in MIDIData:
         time = 0
@@ -56,22 +56,8 @@ def get_onsets( MIDIData ):
                     if not (onsets == time).any():
                         onsets = np.append( onsets, time )
                         velocities = np.append( velocities, event.velocity )
-    # Return onset array
-    return onsets, velocities
-
-# <codecell>
-
-def onsets_to_strength( onsets, velocities ):
-    '''
-    Given onset locations and their velocities, create an onset strength stream
     
-    Input:
-        onsets - onset locations, in seconds
-        velocities - velocity of each onset
-    Output:
-        onset_strength - onset strength function
-        fs - sampling rate of the onset strength function
-    '''
+    
     # Define a sampling rate for the signal
     fs = 1000
     # Create an empty signal
@@ -83,5 +69,38 @@ def onsets_to_strength( onsets, velocities ):
         samp_pos = int(onsets_in_sample[i])
         onset_strength[samp_pos] = velocities[i]
     
-    return onset_strength, fs
+    # get notes
+    # Array for holding notes (1-127)
+    noteMatrix = np.zeros((128,len(onset_strength)+2*fs))  
+    print (len(onset_strength))
+    
+    for track in MIDIData:
+        time = 0
+        for event in track:
+            # Increment time by the tick value of this event
+            time += event.tick*tickScale
+            
+            # If it's a note on event, we'll update the indicator and record the note
+            if event.name == 'Note On' and event.channel != 9 and event.velocity > 0:
+                index = int(time * fs)
+                noteMatrix[event.pitch][index:] = event.velocity
+                #print '[' + str(event.pitch) + ']' + '[' + str(index) + ']' + ':' + str(event.velocity)
+         
+            if event.name == 'Note Off' and event.channel != 9:
+                index = int(time * fs)
+                noteMatrix[event.pitch][index:] = 0
+                #print '[' + str(event.pitch) + ']' + '[' + str(index) + ']' + ':' + str(event.velocity)
+            
+            if event.name == 'Note On' and event.channel != 9 and event.velocity == 0:
+                index = int(time * fs)
+                noteMatrix[event.pitch][index:] = 0
+            
+    return noteMatrix, onset_strength, fs
+
+
+# <codecell>
+
+if __name__=='__main__':
+    print 'midi.read_midifile(MIDIFile)'
+    print 'get_onsets_and_notes(MIDIData)'
 
