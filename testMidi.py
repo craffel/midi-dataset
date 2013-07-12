@@ -11,6 +11,7 @@ import beat_aligned_feats
 
 # <codecell>
 
+
 # Getting beat-synchronized chromagram from midi file
 testData = midi.read_midifile("3565Hero.mid")
 noteMatrix, bpm, beats, fs = midi_to_features.get_onsets_and_notes(testData)
