@@ -70,8 +70,7 @@ def get_onsets_and_notes( MIDIData ):
     for i in range(len(onsets_in_sample)):
         samp_pos = int(onsets_in_sample[i])
         onset_strength[samp_pos] = velocities[i]
-   
-        
+           
     # Get beats
     bpm,beats = librosa.beat.beat_track(onsets = onset_strength)
     
