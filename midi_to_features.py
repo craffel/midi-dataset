@@ -125,11 +125,33 @@ def get_beat_chroma(noteMatrix,beats) :
     beatChroma[:,0] = np.mean(chroma_matrix[:,0:beats[0]-1],1)
     for i in range(len(beats)-1):
         beatChroma[:,i] = np.mean(chroma_matrix[:,beats[i]:beats[i+1]-1],1)
-        # normalize??
+        
     beatChroma[:,-1] = np.mean(chroma_matrix[:,beats[i+1]:-1],1)
+    
+    # Normalize?
+    
     
     return beatChroma
     
+
+# <codecell>
+
+def get_normalize_beatChroma(beatChroma):
+    '''
+    Given beatChroma, normalize each time segment into sum 1
+    
+    Input:
+        beatChroma - unnormalized beat-synchronized chromagram
+    Output:
+        beatChroma_normalize - normalized beat-synchronized chromagram
+    '''
+    beatChroma_normalize = beatChroma
+    for col in range(beatChroma.shape[1]):
+        chromaSum = np.sum(beatChroma[:,col])
+        if chromaSum != 0:
+            beatChroma_normalize[:,col] = beatChroma[:,col] / np.sum(beatChroma[:,col])
+            
+    return beatChroma_normalize
 
 # <codecell>
 
@@ -137,4 +159,5 @@ if __name__=='__main__':
     print 'midi.read_midifile(MIDIFile)'
     print 'get_onsets_and_notes(MIDIData)'
     print 'get_beat_chroma(noteMatrix,beats)'
+    print 'get_normalize_beatChroma(beatChroma)'
 
