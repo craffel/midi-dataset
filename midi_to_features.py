@@ -9,6 +9,11 @@ import os
 import random
 import string
 import librosa
+import collections
+
+# <codecell>
+
+(10, 20) + (20)
 
 # <codecell>
 
@@ -23,80 +28,49 @@ def get_onsets_and_notes( MIDIData ):
         onset_strength - onset strength function
         fs - sampling rate of the onset strength function
     '''
-    # Array for holding onset locations (in seconds)
-    onsets = np.array([])
-    # Array for velocities too
-    velocities = np.array([])
-    tickScale = 1
-    foundTempo = 0
-    # Find the tempo setting message
-    for track in MIDIData:
-        for event in track:
-            if event.name == 'Set Tempo':
-                if foundTempo:
-                    print "Warning: Multiple tempi found."
-                    break
-                else:
-                    tickScale = 60.0/(event.get_bpm()*MIDIData.resolution)
-                    foundTempo = 1
-    # Warn if no tempo message was found, and set tick scale to 1 (which is kind of useless)
-    if np.isnan( tickScale ):
-        print "Warning: No tempo found."
-        tickScale = 1
-        
-    # Iterate through tracks and events
-    for track in MIDIData:
-        time = 0
-        for event in track:
-            # Increment time by the tick value of this event
-            time += event.tick*tickScale
-            # If it's a note on event, we'll record the onset time
-            if event.name == 'Note On':
-                # If it's not a note-off event masquerading as a note-on
-                if event.velocity > 0:
-                    # Check for duplicates before adding in
-                    if not (onsets == time).any():
-                        onsets = np.append( onsets, time )
-                        velocities = np.append( velocities, event.velocity )
+    # Normalize to 120 bpm
+    tickScale = 60.0/(120*MIDIData.resolution)
     
-    
-    # Define a sampling rate for the signal
-    fs = 1000
-    # Create an empty signal
-    onset_strength = np.zeros( int(fs*onsets.max()) +1 )
-     
-    # Convert to samples, fill in onset values
-    onsets_in_sample = onsets * fs
-    for i in range(len(onsets_in_sample)):
-        samp_pos = int(onsets_in_sample[i])
-        onset_strength[samp_pos] = velocities[i]
-           
-    # Get beats
-    bpm,beats = librosa.beat.beat_track(onsets = onset_strength)
-    
-    # Get notes
-    noteMatrix = np.zeros((128,len(onset_strength)+2*fs))  
-    for track in MIDIData:
+    # Dict of note events - keys are (track, channel, note), values are a list of [velocity, note on time, note off time]
+    noteDict = collections.defaultdict(list)
+    lastNoteOff = 0
+    for trackNumber, track in enumerate( MIDIData ):
         time = 0
         for event in track:
             # Increment time by the tick value of this event
             time += event.tick*tickScale
             
-            # If it's a note on event, we'll update the indicator and record the note
+            # For a note on event, always create a new note list in the dict
             if event.name == 'Note On' and event.channel != 9 and event.velocity > 0:
-                index = int(time * fs)
-                noteMatrix[event.pitch][index:] = event.velocity
-         
-            if event.name == 'Note Off' and event.channel != 9:
-                index = int(time * fs)
-                noteMatrix[event.pitch][index:] = 0
+                noteDict[(trackNumber, event.channel, event.pitch)] += [[event.velocity, time]]
             
-            if event.name == 'Note On' and event.channel != 9 and event.velocity == 0:
-                index = int(time * fs)
-                noteMatrix[event.pitch][index:] = 0
-            
-    return noteMatrix, bpm, beats, fs
+            elif (event.name == 'Note Off' and event.channel != 9) or (event.name == 'Note On' and event.channel != 9 and event.velocity == 0):
+                # Was a note-on stored? (ignore spurious note-offs)
+                if len( noteDict[(trackNumber, event.channel, event.pitch)] ) > 0:
+                    # Has a note-off been stored already?
+                    if len( noteDict[(trackNumber, event.channel, event.pitch)][-1] ) == 2:
+                        noteDict[(trackNumber, event.channel, event.pitch)][-1] += [time]
+                        # Remember the final note-off
+                        if time > lastNoteOff:
+                            lastNoteOff = time
 
+    # Create note matrix
+    fs = 1000
+    noteMatrix = np.zeros( (128, fs*(lastNoteOff + 1)), dtype=np.int16 )
+    firstNoteOn = np.inf
+    for (track, channel, note), events in noteDict.items():
+        for event in events:
+            # Make sure a note off was recorded
+            if len( event ) > 2: 
+                velocity, start, end = event
+                noteMatrix[note, int(start*fs):int(end*fs)] += velocity
+                if start < firstNoteOn:
+                    firstNoteOn = start
+    
+    # Create artificial beat locations
+    beats = np.arange( firstNoteOn*fs, noteMatrix.shape[1], .5*fs )
+    
+    return noteMatrix, beats, fs
 
 # <codecell>
 
@@ -112,12 +86,8 @@ def get_beat_chroma(noteMatrix,beats) :
     '''
     # Fold into one octave
     chroma_matrix = np.zeros((12,noteMatrix.shape[1]))
-    for note in range(12):
-        chroma_matrix[note,:] = np.sum([noteMatrix[12*0+note,:], noteMatrix[12*1+note,:], noteMatrix[12*2+note,:],
-                                        noteMatrix[12*3+note,:], noteMatrix[12*4+note,:], noteMatrix[12*5+note,:],
-                                        noteMatrix[12*6+note,:], noteMatrix[12*7+note,:], noteMatrix[12*8+note,:],
-                                        noteMatrix[12*9+note,:] ], axis=0)
-    
+    for note in rrange(12):
+        chroma_matrix[note, :] = np.sum( noteMatrix[note::12], axis=0 )
         
     # Get beat-synchronized chroma matrix by taking the mean across each beat
     beatChroma = np.zeros((12,len(beats)+1))
@@ -126,9 +96,6 @@ def get_beat_chroma(noteMatrix,beats) :
         beatChroma[:,i] = np.mean(chroma_matrix[:,beats[i]:beats[i+1]-1],1)
         
     beatChroma[:,-1] = np.mean(chroma_matrix[:,beats[i+1]:-1],1)
-    
-    # Normalize?
-    
     
     return beatChroma
     
@@ -144,19 +111,34 @@ def get_normalize_beatChroma(beatChroma):
     Output:
         beatChroma_normalize - normalized beat-synchronized chromagram
     '''
-    beatChroma_normalize = beatChroma
-    for col in range(beatChroma.shape[1]):
-        chromaSum = np.sum(beatChroma[:,col])
-        if chromaSum != 0:
-            beatChroma_normalize[:,col] = beatChroma[:,col] / np.sum(beatChroma[:,col])
-            
-    return beatChroma_normalize
+    colMax = beatChroma.max( axis = 0 )
+    # Avoid divide by 0 by adding 1 when max is 0
+    return beatChroma/(colMax + (colMax == 0))
 
 # <codecell>
 
 if __name__=='__main__':
-    print 'midi.read_midifile(MIDIFile)'
-    print 'get_onsets_and_notes(MIDIData)'
-    print 'get_beat_chroma(noteMatrix,beats)'
-    print 'get_normalize_beatChroma(beatChroma)'
+    MIDIFile = 'Data/3565Hero.mid'
+    MIDIData = midi.read_midifile(MIDIFile)
+    noteMatrix, beats, fs = get_onsets_and_notes(MIDIData)
+    beatChroma = get_beat_chroma(noteMatrix,beats)
+    beatChroma = get_normalize_beatChroma(beatChroma)
+
+    plt.figure( figsize=(24, 15) )
+    plt.subplot( 311 )
+    plt.axis( 'off' )
+    plt.title( 'MIDI Transcription (with beats)' )
+    plt.imshow( noteMatrix[36:96, 4000:20250], interpolation='nearest', aspect='auto', origin='lower', cmap=plt.cm.gray_r )
+    plt.vlines( beats[beats < 20250] - 4000, -.5, 59.5 )
+    plt.subplot( 312 )
+    plt.axis( 'off' )
+    plt.title( 'MIDI-synthesized Chromagram' )
+    plt.imshow( beatChroma[:,:(beats[beats < 20250].shape[0])], interpolation='nearest', aspect='auto', origin='lower', cmap=plt.cm.gray_r )
+    plt.subplot( 313 )
+    plt.axis( 'off' )
+    plt.title( 'MSD Chromagram' )
+    import beat_aligned_feats
+    msdChroma = beat_aligned_feats.get_btchromas( 'Data/TRJWCEA128F4273174(hero).h5' )
+    plt.imshow( msdChroma[:,5:(beats[beats < 20250].shape[0]) + 5], interpolation='nearest', aspect='auto', origin='lower', cmap=plt.cm.gray_r )
+    
 
