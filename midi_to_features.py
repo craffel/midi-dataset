@@ -128,17 +128,17 @@ if __name__=='__main__':
     plt.subplot( 311 )
     plt.axis( 'off' )
     plt.title( 'MIDI Transcription (with beats)' )
-    plt.imshow( noteMatrix[36:96, 4000:20250], interpolation='nearest', aspect='auto', origin='lower', cmap=plt.cm.gray_r )
-    plt.vlines( beats[beats < 20250] - 4000, -.5, 59.5 )
+    plt.imshow( noteMatrix[36:96, 4000:20000], interpolation='nearest', aspect='auto', origin='lower', cmap=plt.cm.gray_r )
+    plt.vlines( beats[beats < 20000] - 4000, -.5, 59.5 )
     plt.subplot( 312 )
     plt.axis( 'off' )
     plt.title( 'MIDI-synthesized Chromagram' )
-    plt.imshow( beatChroma[:,:(beats[beats < 20250].shape[0])], interpolation='nearest', aspect='auto', origin='lower', cmap=plt.cm.gray_r )
+    plt.imshow( beatChroma[:,:(beats[beats < 20000].shape[0])], interpolation='nearest', aspect='auto', origin='lower', cmap=plt.cm.gray_r )
     plt.subplot( 313 )
     plt.axis( 'off' )
     plt.title( 'MSD Chromagram' )
     import beat_aligned_feats
     msdChroma = beat_aligned_feats.get_btchromas( 'Data/TRJWCEA128F4273174(hero).h5' )
-    plt.imshow( msdChroma[:,5:(beats[beats < 20250].shape[0]) + 5], interpolation='nearest', aspect='auto', origin='lower', cmap=plt.cm.gray_r )
+    plt.imshow( msdChroma[:,5:(beats[beats < 20000].shape[0]) + 5], interpolation='nearest', aspect='auto', origin='lower', cmap=plt.cm.gray_r )
     
 
