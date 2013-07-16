@@ -13,10 +13,6 @@ import collections
 
 # <codecell>
 
-(10, 20) + (20)
-
-# <codecell>
-
 def get_onsets_and_notes( MIDIData ):
     '''
     Given a midi.Pattern, extract onset locations and their velocities
@@ -86,7 +82,7 @@ def get_beat_chroma(noteMatrix,beats) :
     '''
     # Fold into one octave
     chroma_matrix = np.zeros((12,noteMatrix.shape[1]))
-    for note in rrange(12):
+    for note in range(12):
         chroma_matrix[note, :] = np.sum( noteMatrix[note::12], axis=0 )
         
     # Get beat-synchronized chroma matrix by taking the mean across each beat
