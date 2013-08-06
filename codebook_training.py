@@ -14,6 +14,7 @@ import librosa
 import glob
 from datastream import datastream
 from BufferedEstimator import BufferedEstimator
+import pickle
 
 # <codecell>
 
@@ -50,8 +51,11 @@ def train(myDir, mySize, bookName):
     buf_est = BufferedEstimator(estimator, batch_size=mySize)
     buf_est.fit(data_generator)
     
-    # Save the codebook
-    codebook = estimator.components_.T
+    # Save the codebook (estimator)
+    # codebook = estimator.components_.T
     np.save(bookName,codebook)
+    f = open(bookName,'wb')
+    pickle.dump(estimator,f)
+    f.close()
     
 
