@@ -17,10 +17,6 @@ import midi_to_features
 
 # <codecell>
 
-BITS_12 = 2**np.arange(0, 12)
-
-# <codecell>
-
 # Packing four 12-bit numbers into one 48-bit number
 def pack4(x):
     
@@ -32,9 +28,11 @@ def pack4(x):
 # <codecell>
 
 # Getting the codeword using thresholding
+BITS_12 = 2**np.arange(0, 12)
 def getCodeword(beatChroma,thres):
     beatChroma[beatChroma < thres] = 0
     beatChroma[beatChroma >= thres] = 1
+    # Dot product of the beatChroma and the BITS array to get a binary codeword for each beat
     return BITS_12.dot(beatChroma)
 
 # <codecell>
@@ -49,7 +47,7 @@ def load_MSD(MSD_DIR,THRES_MSD):
             src = os.path.join( root, song_id )
             if os.path.splitext(song_id)[1].lower() == '.h5':
                 fullName = os.path.join(root,song_id)
-                print fullName
+                #print fullName
                 msd_beatChroma = beat_aligned_feats.get_btchromas(fullName)
                 if msd_beatChroma is not None and not np.isnan(msd_beatChroma).any():
                     msd_codeword = getCodeword(msd_beatChroma,THRES_MSD)
