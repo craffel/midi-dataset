@@ -41,7 +41,7 @@ def getCodeword(beatChroma,thres):
 
 def load_MSD(MSD_DIR,THRES_MSD):
     codeIndex = collections.defaultdict(set)
-    ct = 0
+    #ct = 0
     # Loop through the MSD directory
     for root, directory, f in os.walk(MSD_DIR):
         for song_id in f:
@@ -56,9 +56,9 @@ def load_MSD(MSD_DIR,THRES_MSD):
                     # For 4-codeword in codewords of the song
                     for i in range(len(msd_codeword)-3):
                         subcode = msd_codeword[i:i+4]
-                        # Pack four codewords into a 16 bit binary number, and hash each codeword to the codeIndex
+                        # Pack four 12-bit-codewords into a 48 bit binary number, and hash each codeword to the codeIndex
                         codeIndex[pack4(subcode)].add(song_id)
-                    ct += 1
+                    #ct += 1
                 
                 #if ct % 1000 == 0:
                     #print ct
