@@ -73,21 +73,22 @@ def load_MIDI(midi_Name,THRES_MIDI):
     noteMatrix, beats, fs = midi_to_features.get_onsets_and_notes(midiData)
     midi_beatChroma = midi_to_features.get_beat_chroma(noteMatrix,beats)
     midi_beatChroma = midi_to_features.get_normalize_beatChroma(midi_beatChroma)
-    midi_codeword = getCodeword(midi_beatChroma,THRES_MIDI)
-    return midi_codeword
+    MIDI_codewords = getCodeword(midi_beatChroma,THRES_MIDI)
+    return MIDI_codewords
 
 # <codecell>
 
-# A helper function to find a list of songs that match the 4-beat-based codeword
-def find_song_id(midi_codeword, MSD_Hashing):
-    song_count = collections.defaultdict(int)
+# A helper function 
+# Given an array of midi codewords, for each 4-codeword-combination, find a list of matching-songs, and return a sorted song_id_count
+def get_candidates(MIDI_codewords, codeIndex):
+    song_id_count = collections.defaultdict(int)
     for i in range(len(midi_codeword)-3):
         subcode = midi_codeword[i:i+4]
-        song_list = MSD_Hashing[pack4(subcode)]
+        song_list = codeIndex[pack4(subcode)]
         for elem in song_list:
-            song_count[elem] += 1
-    song_count_sort = sorted(song_count.items(), key=lambda t: t[1], reverse = True)
-    return song_count_sort
+            song_id_count[elem] += 1
+    song_id_count_sort = sorted(song_id_count.items(), key=lambda t: t[1], reverse = True)
+    return song_id_count_sort
 
 # <codecell>
 
@@ -100,9 +101,9 @@ def find_MIDI (codeIndex, MIDI_DIR, MIDI_THRES):
                # (midi_order_no for comparing with the ground truth)
                midi_order_no = midiName.split('-')[1]
                # get the codeword for the midi file
-               MIDI_codeword = load_MIDI(src,MIDI_THRES) 
+               MIDI_codewords = load_MIDI(src,MIDI_THRES) 
                # get a list of candidates from the codeIndex
-               candidates = codeword_hashing.find_song_id(MIDI_codeword,codeIndex)
+               candidates = codeword_hashing.get_candidates(MIDI_codewords,codeIndex)
                # (This is for comparing with the ground truth file)
                for cand in candidates:
                    if cand[0].startswith(midi_order_no + '-'):
