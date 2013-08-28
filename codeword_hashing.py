@@ -37,28 +37,38 @@ def getCodeword(beatChroma,thres):
 
 # <codecell>
 
+def hash_codeword(MSD_DIR,THRES_MSD):
+    my_hashing = collections.defaultdict(set)
+    
+
+# <codecell>
+
 # Hashing the milliong song dataset into codewords, storing in defaultdict(set)
 
 def load_MSD(MSD_DIR,THRES_MSD):
-    my_hashing = collections.defaultdict(set)
+    codeIndex = collections.defaultdict(set)
     ct = 0
+    # Loop through the MSD directory
     for root, directory, f in os.walk(MSD_DIR):
         for song_id in f:
             src = os.path.join( root, song_id )
             if os.path.splitext(song_id)[1].lower() == '.h5':
                 fullName = os.path.join(root,song_id)
-                #print fullName
+                # Get the beat Chroma of the song
                 msd_beatChroma = beat_aligned_feats.get_btchromas(fullName)
                 if msd_beatChroma is not None and not np.isnan(msd_beatChroma).any():
+                    # Get the codewords of the song
                     msd_codeword = getCodeword(msd_beatChroma,THRES_MSD)
+                    # For 4-codeword in codewords of the song
                     for i in range(len(msd_codeword)-3):
                         subcode = msd_codeword[i:i+4]
-                        my_hashing[pack4(subcode)].add(song_id)
+                        # Pack four codewords into a 16 bit binary number, and hash each codeword to the codeIndex
+                        codeIndex[pack4(subcode)].add(song_id)
                     ct += 1
                 
                 #if ct % 1000 == 0:
-                #    print ct
-    return my_hashing
+                    #print ct
+    return codeIndex
 
 # <codecell>
 
@@ -74,8 +84,7 @@ def load_MIDI(midi_Name,THRES_MIDI):
 
 # <codecell>
 
-# Find a list of songs that match the 4-beat-based codeword
-
+# A helper function to find a list of songs that match the 4-beat-based codeword
 def find_song_id(midi_codeword, MSD_Hashing):
     song_count = collections.defaultdict(int)
     for i in range(len(midi_codeword)-3):
@@ -85,4 +94,25 @@ def find_song_id(midi_codeword, MSD_Hashing):
             song_count[elem] += 1
     song_count_sort = sorted(song_count.items(), key=lambda t: t[1], reverse = True)
     return song_count_sort
+
+# <codecell>
+
+def find_MIDI (codeIndex, MIDI_DIR, MIDI_THRES):
+    # For each midi test file in the directory
+    for root, directory, f in os.walk(MIDI_DIR):
+        for midiName in f:
+            if midiName[-4:].lower() == '.mid':
+               src = os.path.join( root, midiName )
+               # (midi_order_no for comparing with the ground truth)
+               midi_order_no = midiName.split('-')[1]
+               # get the codeword for the midi file
+               MIDI_codeword = load_MIDI(src,MIDI_THRES) 
+               # get a list of candidates from the codeIndex
+               candidates = codeword_hashing.find_song_id(MIDI_codeword,codeIndex)
+               # (This is for comparing with the ground truth file)
+               for cand in candidates:
+                   if cand[0].startswith(midi_order_no + '-'):
+                      ct += 1
+                      print ct
+                      print midiName
 
