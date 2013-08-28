@@ -17,6 +17,7 @@ import midi_to_features
 
 # <codecell>
 
+# Helper function
 # Packing four 12-bit numbers into one 48-bit number
 def pack4(x):
     
@@ -27,6 +28,7 @@ def pack4(x):
 
 # <codecell>
 
+# Helper function
 # Getting the codeword using thresholding
 BITS_12 = 2**np.arange(0, 12)
 def getCodeword(beatChroma,thres):
@@ -37,8 +39,8 @@ def getCodeword(beatChroma,thres):
 
 # <codecell>
 
+# Step 1: 
 # Hashing the milliong song dataset into codewords, storing in defaultdict(set)
-
 def load_MSD(MSD_DIR,THRES_MSD):
     codeIndex = collections.defaultdict(set)
     #ct = 0
@@ -66,8 +68,8 @@ def load_MSD(MSD_DIR,THRES_MSD):
 
 # <codecell>
 
+# Helper function
 # Load the midi file and get the codeword array
-
 def load_MIDI(midi_Name,THRES_MIDI):
     midiData = midi.read_midifile(midi_Name)
     noteMatrix, beats, fs = midi_to_features.get_onsets_and_notes(midiData)
@@ -78,7 +80,7 @@ def load_MIDI(midi_Name,THRES_MIDI):
 
 # <codecell>
 
-# A helper function 
+# Helper function 
 # Given an array of midi codewords, for each 4-codeword-combination, find a list of matching-songs, and return a sorted song_id_count
 def get_candidates(MIDI_codewords, codeIndex):
     song_id_count = collections.defaultdict(int)
@@ -92,22 +94,12 @@ def get_candidates(MIDI_codewords, codeIndex):
 
 # <codecell>
 
-def find_MIDI (codeIndex, MIDI_DIR, MIDI_THRES):
-    # For each midi test file in the directory
-    for root, directory, f in os.walk(MIDI_DIR):
-        for midiName in f:
-            if midiName[-4:].lower() == '.mid':
-               src = os.path.join( root, midiName )
-               # (midi_order_no for comparing with the ground truth)
-               midi_order_no = midiName.split('-')[1]
-               # get the codeword for the midi file
-               MIDI_codewords = load_MIDI(src,MIDI_THRES) 
-               # get a list of candidates from the codeIndex
-               candidates = codeword_hashing.get_candidates(MIDI_codewords,codeIndex)
-               # (This is for comparing with the ground truth file)
-               for cand in candidates:
-                   if cand[0].startswith(midi_order_no + '-'):
-                      ct += 1
-                      print ct
-                      print midiName
+# Step II: query
+# Given a name of the midi file, match is among MSD
+def query_MIDI(codeIndex, midiName, THRES_MIDI):
+    # get the codeword for the midi file
+    MIDI_codewords = load_MIDI(midiName,THRES_MIDI) 
+    # get a sorted song_id_count for the codewords
+    song_id_count_sort = get_candidates(MIDI_codewords,codeIndex)    
+    return song_id_count_sort
 
