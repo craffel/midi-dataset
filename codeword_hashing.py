@@ -37,12 +37,6 @@ def getCodeword(beatChroma,thres):
 
 # <codecell>
 
-def hash_codeword(MSD_DIR,THRES_MSD):
-    my_hashing = collections.defaultdict(set)
-    
-
-# <codecell>
-
 # Hashing the milliong song dataset into codewords, storing in defaultdict(set)
 
 def load_MSD(MSD_DIR,THRES_MSD):
