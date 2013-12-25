@@ -69,7 +69,7 @@ def get_cal10k_list(csv_file):
     with open(csv_file, 'rb') as f:
         for line in f:
             fields = line.split('\t')
-            cal10k_list += [[fields[0], fields[2], fields[1]]]
+            cal10k_list += [[fields[0], fields[1], fields[2]]]
     # Remove first line - labels
     cal10k_list = cal10k_list[1:]
     for n, line in enumerate( cal10k_list ):
@@ -80,7 +80,7 @@ def get_cal10k_list(csv_file):
 # <codecell>
 
 # Code from Brian McFee
-def createIndex(index_path, track_list):
+def create_index(index_path, track_list):
     '''
     Creates a whoosh index directory for the MSD
 
@@ -89,7 +89,7 @@ def createIndex(index_path, track_list):
         track_list - list of lists, each list contains track_id, artist, title
     '''
     
-    writer = createIndexWriter(index_path)
+    writer = create_index_writer(index_path)
     
     for (track_id, artist_name, song_name) in track_list:
         writer.add_document(    track_id    = track_id,
@@ -114,31 +114,38 @@ def get_whoosh_index(index_path):
 
 # <codecell>
 
-def search( index, string ):
+def search( searcher, schema, artist, title, threshold=20 ):
     '''
-    Search a whoosh searcher for a string, and return the best match
+    Search for an artist - title pair and return the best match
 
     Input:
-        searcher - whoosh searcher object
-        string - whoosh index
+        searcher - whoosh searcher (create with index.searcher() then close it yourself)
+        schema - whoosh schema (index.schema)
+        artist - Artist name
+        title - Song name
+        threshold - Score threshold for a match
     Output:
         best_match - best match for the search, or None of no match
     '''
-    searcher = index.searcher()
-    q = whoosh.qparser.MultifieldParser(['title', 'artist'], index.schema).parse(unicode(string, encoding='utf-8'))
+    arparser = whoosh.qparser.QueryParser('artist', schema)
+    tiparser = whoosh.qparser.QueryParser('title', schema)
+    q = whoosh.query.And([arparser.parse(unicode(artist, encoding='utf-8')), tiparser.parse(unicode(title, encoding='utf-8'))])
     results = searcher.search(q)
+    result = None
+    
     if len(results) > 0:
         r = results[0]
-        return [r['track_id'], r['artist'], r['title']]
-    else:
-        return None
+        if r.score > threshold:
+            result = [r['track_id'], r['artist'], r['title']]
+    
+    return result
 
 # <codecell>
 
 if __name__=='__main__':
     import os
     if not os.path.exists('Whoosh Indices/cal10k_index/'):
-        createIndex('Whoosh Indices/cal10k_index/', get_cal10k_list('File Lists/EchoNestTrackIDs.tab') )
+        create_index('Whoosh Indices/cal10k_index/', get_cal10k_list('File Lists/EchoNestTrackIDs.tab') )
     index = get_whoosh_index('Whoosh Indices/cal10k_index/')
-    print search( index, '50 cent' )
+    print search( index.searcher(), index.schema, 'queen', 'under pressure' )
 
