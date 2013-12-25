@@ -12,27 +12,25 @@ import os
 # <codecell>
 
 # Code from Brian McFee
-def createIndexWriter(indexPath):
+def create_index_writer(index_path):
     '''
-    Constructs a whoosh index writer for the MSD
+    Constructs a whoosh index writer, which has an ID field as well as artist and title
     
     Input:
-        indexPath - Path to whoosh index to be written
+        index_path - Path to whoosh index to be written
     Output:
         index - Whoosh index writer
     '''
-    if not os.path.exists(indexPath):
-        os.mkdir(indexPath)
-        pass
+    if not os.path.exists(index_path):
+        os.mkdir(index_path)
 
     A = whoosh.analysis.StemmingAnalyzer() | whoosh.analysis.CharsetFilter(accent_map)
 
     Schema = whoosh.fields.Schema(  track_id    =   whoosh.fields.ID(stored=True),
-                                    song_id     =   whoosh.fields.TEXT(stored=True),
                                     artist      =   whoosh.fields.TEXT(stored=True, analyzer=A),
                                     title       =   whoosh.fields.TEXT(stored=True, analyzer=A))
 
-    index = whoosh.index.create_in(indexPath, Schema)
+    index = whoosh.index.create_in(index_path, Schema)
     return index.writer()
 
 # <codecell>
@@ -44,11 +42,13 @@ def get_msd_list(csv_file):
     Input:
         csv_file - path to unique_tracks.txt
     Output:
-        msd_list - list of lists, each list contains track_id, song_id, artist, title
+        msd_list - list of lists, each list contains track_id, artist, title
     '''
     msd_list = []
     with open(csv_file, 'rb') as f:
-        msd_list = [line.split('<SEP>') for line in f]
+        for line in f:
+            fields = line.split('<SEP>')
+            msd_list += [[fields[0], fields[2], fields[3]]]
     for n, line in enumerate( msd_list ):
         line = [unicode(a.rstrip(), encoding='utf-8') for a in line]
         msd_list[n] = line
@@ -56,26 +56,46 @@ def get_msd_list(csv_file):
 
 # <codecell>
 
+def get_cal10k_list(csv_file):
+    '''
+    Parses the EchoNestTrackIDs.tab file into a python list of lists.
+    
+    Input:
+        csv_file - path to unique_tracks.txt
+    Output:
+        cal10k_list - list of lists, each list contains track_id, artist, title
+    '''
+    cal10k_list = []
+    with open(csv_file, 'rb') as f:
+        for line in f:
+            fields = line.split('\t')
+            cal10k_list += [[fields[0], fields[2], fields[1]]]
+    # Remove first line - labels
+    cal10k_list = cal10k_list[1:]
+    for n, line in enumerate( cal10k_list ):
+        line = [unicode(a.rstrip(), encoding='utf-8') for a in line]
+        cal10k_list[n] = line
+    return cal10k_list
+
+# <codecell>
+
 # Code from Brian McFee
-def createIndex(index_path, csv_file):
+def createIndex(index_path, track_list):
     '''
     Creates a whoosh index directory for the MSD
 
     Input:
         index_path - where to create the whoosh index
-        csv_file - path to unique_tracks.txt
+        track_list - list of lists, each list contains track_id, artist, title
     '''
     
     writer = createIndexWriter(index_path)
-    msd_list = get_msd_list( csv_file )
     
-    for (track_id, song_id, artist_name, song_name) in msd_list:
+    for (track_id, artist_name, song_name) in track_list:
         writer.add_document(    track_id    = track_id,
-                                song_id     = song_id,
                                 artist      = artist_name,
                                 title       = song_name)
 
-        pass
     writer.commit()
     pass
 
@@ -109,14 +129,16 @@ def search( index, string ):
     results = searcher.search(q)
     if len(results) > 0:
         r = results[0]
-        return [r['track_id'], r['song_id'], r['artist'], r['title']]
+        return [r['track_id'], r['artist'], r['title']]
     else:
         return None
 
 # <codecell>
 
 if __name__=='__main__':
-    #createIndex( 'whoosh_index', 'unique_tracks.txt' )
-    #index = get_whoosh_index('whoosh_index')
-    print search( index, 'ace of base/the sign' )
+    import os
+    if not os.path.exists('Whoosh Indices/cal10k_index/'):
+        createIndex('Whoosh Indices/cal10k_index/', get_cal10k_list('File Lists/EchoNestTrackIDs.tab') )
+    index = get_whoosh_index('Whoosh Indices/cal10k_index/')
+    print search( index, '50 cent' )
 
