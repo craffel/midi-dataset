@@ -156,12 +156,12 @@ def align_midi(midi, audio, fs, synthesis_method=None):
     # Synthesize midi audio using pretty_midi
     midi_audio = midi.synthesize(fs=fs, method=synthesis_method)
     # Compute log frequency spectrogram of audio synthesized from MIDI
-    midi_gram = librosa.feature.logfsgram(y=midi_audio,
-                                          sr=fs,
-                                          hop_length=512,
-                                          fmin=librosa.midi_to_hz(36),
-                                          fmax=librosa.midi_to_hz(96),
-                                          tuning=0.0)
+    midi_gram = np.abs(librosa.cqt(y=midi_audio,
+                                   sr=fs,
+                                   hop_length=512,
+                                   fmin=librosa.midi_to_hz(36),
+                                   n_bins=60,
+                                   tuning=0.0))**2
     # Estimate MIDI beat times
     midi_beats = np.array(midi.get_beats()*fs/512.0, dtype=np.int)
     # Estimate the MIDI tempo
@@ -180,38 +180,33 @@ def align_midi(midi, audio, fs, synthesis_method=None):
     # Compute log-amplitude spectrogram
     midi_gram = librosa.logamplitude(midi_gram, ref_power=midi_gram.max())
     
+    # Use harmonic part for gram, percussive for beats
+    H, P = librosa.decompose.hpss(librosa.stft(audio))
+    audio_harmonic = librosa.istft(H)
+    audio_percussive = librosa.istft(P)
     # Compute log-frequency spectrogram of original audio
-    audio_gram = librosa.feature.logfsgram(y=audio,
-                                           sr=fs,
-                                           hop_length=512,
-                                           fmin=librosa.midi_to_hz(36),
-                                           fmax=librosa.midi_to_hz(96))
+    audio_gram = np.abs(librosa.cqt(y=audio_harmonic,
+                                    sr=fs,
+                                    hop_length=512,
+                                    fmin=librosa.midi_to_hz(36),
+                                    n_bins=60))**2
     # Beat track the audio file
-    audio_beats = librosa.beat.beat_track(audio, hop_length=128, bpm=midi_tempo)[1]/4
+    audio_beats = librosa.beat.beat_track(audio_percussive, hop_length=128, bpm=midi_tempo)[1]/4
     # Synchronize the log frequency spectrogram to the beat times
     audio_gram = librosa.feature.sync(audio_gram, audio_beats)[:, 1:]
     # Compute log-amplitude spectrogram
     audio_gram = librosa.logamplitude(audio_gram, ref_power=audio_gram.max())
     
-    # Standardize the features
-    midi_gram = scipy.stats.zscore(midi_gram, axis=1)
-    audio_gram = scipy.stats.zscore(audio_gram, axis=1)
-    # Normalize the columns
-    midi_gram_normalized = librosa.util.normalize(midi_gram, axis=0)
-    audio_gram_normalized = librosa.util.normalize(audio_gram, axis=0)
-    
-    # Get similarity matrix
-    similarity_matrix = scipy.spatial.distance.cdist( midi_gram_normalized.T, audio_gram_normalized.T )
-    
     # Plot log-fs grams
-    plt.figure(figsize=(24, 8))
+    plt.figure(figsize=(24, 24))
+    ax = plt.subplot2grid((4, 2), (0, 0), colspan=2)
     plt.title('MIDI Synthesized')
     librosa.display.specshow(midi_gram,
                              x_axis='frames',
                              y_axis='cqt_note',
                              fmin=librosa.midi_to_hz(36),
                              fmax=librosa.midi_to_hz(96))
-    plt.figure(figsize=(24, 8))
+    ax = plt.subplot2grid((4, 2), (1, 0), colspan=2)
     plt.title('Audio data')
     librosa.display.specshow(audio_gram,
                              x_axis='frames',
@@ -219,10 +214,17 @@ def align_midi(midi, audio, fs, synthesis_method=None):
                              fmin=librosa.midi_to_hz(36),
                              fmax=librosa.midi_to_hz(96))
 
+    # Normalize the columns
+    midi_gram_normalized = librosa.util.normalize(midi_gram, axis=0)
+    audio_gram_normalized = librosa.util.normalize(audio_gram, axis=0)
+
+    # Get similarity matrix
+    similarity_matrix = scipy.spatial.distance.cdist(midi_gram_normalized.T, audio_gram_normalized.T, metric='seuclidean')
+    
     # Get best path through matrix
-    p, q, D, phi, score = dpmod( similarity_matrix**2, 1.01, 0.1 )
+    p, q, D, phi, score = dpmod(similarity_matrix**2, 1.01, 0.1)
     # Plot similarity matrix and best path through it
-    plt.figure(figsize=(10, 10))
+    ax = plt.subplot2grid((4, 2), (2, 0), rowspan=2)
     plt.imshow(similarity_matrix.T,
                aspect='auto',
                interpolation='nearest',
@@ -254,7 +256,7 @@ def align_midi(midi, audio, fs, synthesis_method=None):
         bend.time = (aligned_pitch_bends[n] > 0)*aligned_pitch_bends[n]
 
     # Plot alignment
-    plt.figure(figsize=(10, 6))
+    ax = plt.subplot2grid((4, 2), (2, 1), rowspan=2)
     plt.plot(note_ons, aligned_note_ons - note_ons, '.')
     plt.xlabel('Original note location (s)')
     plt.ylabel('Shift (s)')
@@ -264,6 +266,7 @@ def align_midi(midi, audio, fs, synthesis_method=None):
 
 # <codecell>
 
+%%prun
 if __name__ == '__main__':
     import midi
     import pretty_midi
@@ -295,5 +298,5 @@ if __name__ == '__main__':
         librosa.output.write_wav('tmp.wav', np.vstack([m_aligned, audio]).T, fs)
         # Convert to mp3
         subprocess.call(['ffmpeg', '-i', 'tmp.wav', '-ab', '128k', '-y', filename.replace('audio', 'midi-aligned')])
-        plt.show()
+        plt.savefig(filename.replace('audio', 'midi-aligned').replace('.mp3', '.pdf'))
 
