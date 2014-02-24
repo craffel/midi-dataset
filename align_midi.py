@@ -7,6 +7,7 @@ import numpy as np
 import librosa
 import scipy.stats
 import scipy.spatial.distance
+import matplotlib.pyplot as plt
 
 # <codecell>
 
@@ -140,21 +141,19 @@ def maptimes(t, intime, outtime):
 
 # <codecell>
 
-def align_midi(midi, audio, fs, synthesis_method=None):
+def align_midi(midi, midi_audio, audio, fs):
     '''
     Aligns a PrettyMidi object to some audio data
     
     Input:
         midi - pretty_midi.PrettyMIDI object
+        midi_audio - synthesis of the midi object
         audio - audio data which should be the same song as midi
         fs - Sampling rate of audio data
-        synthesis_method - Method to pass to pretty_midi to synthesize MIDI to audio
     Output:
         midi_aligned - midi aligned to audio, another pretty_midi.PrettyMIDI object
         cost - DP cost
     '''
-    # Synthesize midi audio using pretty_midi
-    midi_audio = midi.synthesize(fs=fs, method=synthesis_method)
     # Compute log frequency spectrogram of audio synthesized from MIDI
     midi_gram = np.abs(librosa.cqt(y=midi_audio,
                                    sr=fs,
@@ -180,18 +179,14 @@ def align_midi(midi, audio, fs, synthesis_method=None):
     # Compute log-amplitude spectrogram
     midi_gram = librosa.logamplitude(midi_gram, ref_power=midi_gram.max())
     
-    # Use harmonic part for gram, percussive for beats
-    H, P = librosa.decompose.hpss(librosa.stft(audio))
-    audio_harmonic = librosa.istft(H)
-    audio_percussive = librosa.istft(P)
     # Compute log-frequency spectrogram of original audio
-    audio_gram = np.abs(librosa.cqt(y=audio_harmonic,
+    audio_gram = np.abs(librosa.cqt(y=audio,
                                     sr=fs,
                                     hop_length=512,
                                     fmin=librosa.midi_to_hz(36),
                                     n_bins=60))**2
     # Beat track the audio file
-    audio_beats = librosa.beat.beat_track(audio_percussive, hop_length=128, bpm=midi_tempo)[1]/4
+    audio_beats = librosa.beat.beat_track(audio, hop_length=128, bpm=midi_tempo)[1]/4
     # Synchronize the log frequency spectrogram to the beat times
     audio_gram = librosa.feature.sync(audio_gram, audio_beats)[:, 1:]
     # Compute log-amplitude spectrogram
@@ -266,27 +261,32 @@ def align_midi(midi, audio, fs, synthesis_method=None):
 
 # <codecell>
 
-%%prun
 if __name__ == '__main__':
     import midi
     import pretty_midi
     import glob
     import subprocess
+    import joblib
+    import os
     SF2_PATH = '../Performer Synchronization Measure/SGM-V2.01.sf2'
-    # Get all .mp3 files in the cal500 collection which matched MIDI files
-    for filename in glob.glob('data/cal500/audio/*.mp3'):
+    
+    def process_one_file(filename):
+        '''
+        Helper function for aligning a single audio file.
+        '''
         # Load in the corresponding midi file in the midi directory
         try:
             m = pretty_midi.PrettyMIDI(midi.read_midifile(filename.replace('audio', 'midi').replace('.mp3', '.mid')))
         except:
-            continue
+            return
         print filename.split('/')[-1]
         # Load in audio data
         audio, fs = librosa.load(filename)
+        midi_audio, fs = librosa.load(filename.replace('audio', 'midi'), sr=fs)
         # Perform the alignment
-        m = align_midi(m, audio, fs, SF2_PATH)
+        m = align_midi(m, midi_audio, audio, fs, SF2_PATH)
         # Write out the aligned file
-        m.write(filename.replace('audio', 'midi-aligned').replace('.mp3', '.mid'))
+        m.write(filename.replace('audio', 'midi-aligned-drums-no-hpss').replace('.mp3', '.mid'))
         # Synthesize the aligned midi
         m_aligned = m.synthesize(fs=fs, method=SF2_PATH)
         # Trim to the same size as audio
@@ -295,8 +295,21 @@ if __name__ == '__main__':
         else:
             m_aligned = np.pad(m_aligned, (0, audio.shape[0] - m_aligned.shape[0]), 'constant')
         # Write out
-        librosa.output.write_wav('tmp.wav', np.vstack([m_aligned, audio]).T, fs)
+        librosa.output.write_wav(filename.replace('audio', 'midi-aligned-drums-no-hpss').replace('.mp3', '.wav'),
+                                 np.vstack([m_aligned, audio]).T, fs)
         # Convert to mp3
-        subprocess.call(['ffmpeg', '-i', 'tmp.wav', '-ab', '128k', '-y', filename.replace('audio', 'midi-aligned')])
-        plt.savefig(filename.replace('audio', 'midi-aligned').replace('.mp3', '.pdf'))
+        subprocess.call(['ffmpeg',
+                         '-i',
+                         filename.replace('audio', 'midi-aligned-drums-no-hpss').replace('.mp3', '.wav'),
+                         '-ab',
+                         '128k',
+                         '-y',
+                         filename.replace('audio', 'midi-aligned-drums-no-hpss')])
+        os.remove(filename.replace('audio', 'midi-aligned-drums-no-hpss').replace('.mp3', '.wav'))
+        plt.savefig(filename.replace('audio', 'midi-aligned-drums-no-hpss').replace('.mp3', '.pdf'))
+        plt.close()
+    
+    # Parallelization!
+    joblib.Parallel(n_jobs=6)(joblib.delayed(process_one_file)(filename) for filename in glob.glob('data/cal500/audio/*.mp3'))
+    #joblib.Parallel(n_jobs=1)(joblib.delayed(process_one_file)(filename) for filename in ['data/cal500/audio/aaron_neville-tell_it_like_it_is.mp3'])    
 
