@@ -25,26 +25,45 @@ def dpmod(M, pen=1.0, G=0.0):
         phi - Backtrace
         score - DP score
     '''
-        
-    # Matrix of costs
-    D = np.zeros((M.shape[0] + 1, M.shape[1] + 1))
-    # Set edges to infinity, which forces a path across all of M
-    D[0,:] = np.inf
-    D[:,0] = np.inf
-    # Set initial cost to 0
-    D[0,0] = 0
-    # Any start locations within the "gulley" also have cost 0
-    D[:int(round(G*M.shape[0])), 0] = 0
-    D[0, :int(round(G*M.shape[1]))] = 0
-    # Now, populate with the local costs
+    
+    side_fill_value = 2*M.max()
+    
+    # Matrix of costs, with an additional row and column at the beginning and end
+    D = np.zeros((M.shape[0] + 4, M.shape[1] + 4))
+    # Compute size of gulley in rows and columns
+    gulley_x = int(round(G*M.shape[1]))
+    gulley_y = int(round(G*M.shape[0]))
+    # Must be at least 1 for the logic below to work
+    gulley_x += (gulley_x == 0)
+    gulley_y += (gulley_y == 0)
+    # Fill in a linear ramp of length gulley_x in the first row to M.max()
+    D[1, :gulley_x] = np.linspace(0, side_fill_value, gulley_x)
+    # Same for first column
+    D[:gulley_y, 1] = np.linspace(0, side_fill_value, gulley_y)
+    # Now, ramp from M.max() to 0 for the bottom right corner
+    D[-2, -gulley_x:] = np.linspace(0, side_fill_value, gulley_x)[::-1]
+    D[-gulley_y:, -2] = np.linspace(0, side_fill_value, gulley_y)[::-1]
+    # After the ramp, just fill in the max til the end
+    D[1, gulley_x:] = side_fill_value    
+    D[gulley_y:, 1] = side_fill_value    
+    D[-2, :-gulley_x] = side_fill_value
+    D[:-gulley_y, -2] = side_fill_value  
+    # Finally, populate the middle of the matrix with the local costs
     D[1:(M.shape[0] + 1), 1:(M.shape[1] + 1)] = M
+    # Finally, fill in infinity for the edges
+    D[:, 0] = np.inf
+    D[0, :] = np.inf
+    D[:, -1] = np.inf
+    D[-1, :] = np.inf
+    D[0, 0] = 0
+    D[-1, -1] = 0
     
     # Store the traceback
-    phi = np.zeros(M.shape)
+    phi = np.zeros(D.shape)
     
-    for i in xrange(M.shape[0]): 
-        for j in xrange(M.shape[1]):
-            # The possible locations we can move to
+    for i in xrange(D.shape[0] - 1): 
+        for j in xrange(D.shape[1] - 1):
+            # The possible locations we can move to, weighted by penalty score
             next_moves = [D[i, j], pen*D[i, j+1], pen*D[i+1, j]]
             # Choose the lowest cost
             tb = np.argmin(next_moves)
@@ -54,35 +73,19 @@ def dpmod(M, pen=1.0, G=0.0):
             # Store the traceback
             phi[i, j] = tb
     
-    if G == 0:
-        # Traceback from corner
-        i = M.shape[0] - 1
-        j = M.shape[1] - 1
-    else:
-        # Traceback from lowest cost to the gully
-        edge_row = D[M.shape[0] - 1, :]
-        edge_column = D[:, M.shape[1] - 1]
-        # Set points not in gully to the max of D, so that they are not considered for min
-        largest_value = D[D != np.inf].max()
-        edge_row[:int(round((1 - G)*M.shape[1]))] = largest_value
-        edge_column[:int(round((1 - G)*M.shape[0]))] = largest_value
-        # Find the lowest-cost start point in the gulleys
-        if (min(edge_row) < min(edge_column)):
-            i = M.shape[0] - 1
-            j = max(np.flatnonzero(edge_row == min(edge_row)))
-        else:
-            i = max(np.flatnonzero(edge_column == min(edge_column)))
-            j = M.shape[1] - 1
+    # Traceback from corner
+    i = D.shape[0] - 3
+    j = D.shape[1] - 3
     
     # Score is the final score of the best path
-    score = D[i,j]
+    score = D[i, j]
     
     # These vectors will give the lowest-cost path
     p = np.array([i])
     q = np.array([j])
     
     # Until we reach an edge
-    while i > 0 and j > 0:
+    while i > 2 and j > 2:
         # If the tracback matrix indicates a diagonal move...
         if phi[i, j] == 0:
             i = i - 1
@@ -97,8 +100,11 @@ def dpmod(M, pen=1.0, G=0.0):
         p = np.append(i, p)
         q = np.append(j, q)
     
+    p -= 2
+    q -= 2
+    
     # Strip off the edges of the D matrix before returning
-    D = D[1:M.shape[0],1:M.shape[1]]
+    #D = D[1:M.shape[0],1:M.shape[1]]
     
     # Normalize score
     score = score/q.shape[0]
@@ -217,7 +223,7 @@ def align_midi(midi, midi_audio, audio, fs):
     similarity_matrix = scipy.spatial.distance.cdist(midi_gram_normalized.T, audio_gram_normalized.T, metric='seuclidean')
     
     # Get best path through matrix
-    p, q, D, phi, score = dpmod(similarity_matrix**2, 1.01, 0.1)
+    p, q, D, phi, score = dpmod(similarity_matrix**2, 1.001, 1.)
     # Plot similarity matrix and best path through it
     ax = plt.subplot2grid((4, 2), (2, 0), rowspan=2)
     plt.imshow(similarity_matrix.T,
