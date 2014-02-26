@@ -225,7 +225,7 @@ def align_midi(midi, midi_audio, audio, fs):
                interpolation='nearest',
                cmap=plt.cm.gray)
     tight = plt.axis()
-    plt.plot(p, q, 'r:')
+    plt.plot(p, q, 'r.')
     plt.axis(tight)
     plt.title('Similarity matrix and lowest-cost path, cost={}'.format(score))
     
@@ -269,6 +269,9 @@ if __name__ == '__main__':
     import joblib
     import os
     SF2_PATH = '../Performer Synchronization Measure/SGM-V2.01.sf2'
+    OUTPUT_PATH = 'midi-aligned-new-dpmod'
+    if not os.path.exists(OUTPUT_PATH):
+        os.makedirs(OUTPUT_PATH)
     
     def process_one_file(filename):
         '''
@@ -284,9 +287,9 @@ if __name__ == '__main__':
         audio, fs = librosa.load(filename)
         midi_audio, fs = librosa.load(filename.replace('audio', 'midi'), sr=fs)
         # Perform the alignment
-        m = align_midi(m, midi_audio, audio, fs, SF2_PATH)
+        m = align_midi(m, midi_audio, audio, fs)
         # Write out the aligned file
-        m.write(filename.replace('audio', 'midi-aligned-drums-no-hpss').replace('.mp3', '.mid'))
+        m.write(filename.replace('audio', OUTPUT_PATH).replace('.mp3', '.mid'))
         # Synthesize the aligned midi
         m_aligned = m.synthesize(fs=fs, method=SF2_PATH)
         # Trim to the same size as audio
@@ -295,21 +298,20 @@ if __name__ == '__main__':
         else:
             m_aligned = np.pad(m_aligned, (0, audio.shape[0] - m_aligned.shape[0]), 'constant')
         # Write out
-        librosa.output.write_wav(filename.replace('audio', 'midi-aligned-drums-no-hpss').replace('.mp3', '.wav'),
+        librosa.output.write_wav(filename.replace('audio', OUTPUT_PATH).replace('.mp3', '.wav'),
                                  np.vstack([m_aligned, audio]).T, fs)
         # Convert to mp3
         subprocess.call(['ffmpeg',
                          '-i',
-                         filename.replace('audio', 'midi-aligned-drums-no-hpss').replace('.mp3', '.wav'),
+                         filename.replace('audio', OUTPUT_PATH).replace('.mp3', '.wav'),
                          '-ab',
                          '128k',
                          '-y',
-                         filename.replace('audio', 'midi-aligned-drums-no-hpss')])
-        os.remove(filename.replace('audio', 'midi-aligned-drums-no-hpss').replace('.mp3', '.wav'))
-        plt.savefig(filename.replace('audio', 'midi-aligned-drums-no-hpss').replace('.mp3', '.pdf'))
+                         filename.replace('audio', OUTPUT_PATH)])
+        os.remove(filename.replace('audio', OUTPUT_PATH).replace('.mp3', '.wav'))
+        plt.savefig(filename.replace('audio', OUTPUT_PATH).replace('.mp3', '.pdf'))
         plt.close()
     
     # Parallelization!
     joblib.Parallel(n_jobs=6)(joblib.delayed(process_one_file)(filename) for filename in glob.glob('data/cal500/audio/*.mp3'))
-    #joblib.Parallel(n_jobs=1)(joblib.delayed(process_one_file)(filename) for filename in ['data/cal500/audio/aaron_neville-tell_it_like_it_is.mp3'])    
 
