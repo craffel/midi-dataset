@@ -29,7 +29,7 @@ def dpmod(M, pen=1.0, G=0.0):
     side_fill_value = 2*M.max()
     
     # Matrix of costs, with an additional row and column at the beginning and end
-    D = np.zeros((M.shape[0] + 4, M.shape[1] + 4))
+    D = np.zeros(M.shape)
     # Compute size of gulley in rows and columns
     gulley_x = int(round(G*M.shape[1]))
     gulley_y = int(round(G*M.shape[0]))
@@ -37,45 +37,52 @@ def dpmod(M, pen=1.0, G=0.0):
     gulley_x += (gulley_x == 0)
     gulley_y += (gulley_y == 0)
     # Fill in a linear ramp of length gulley_x in the first row to M.max()
-    D[1, :gulley_x] = np.linspace(0, side_fill_value, gulley_x)
+    D[0, :gulley_x] += np.linspace(0, side_fill_value, gulley_x)
     # Same for first column
-    D[:gulley_y, 1] = np.linspace(0, side_fill_value, gulley_y)
+    D[:gulley_y, 0] += np.linspace(0, side_fill_value, gulley_y)
     # Now, ramp from M.max() to 0 for the bottom right corner
-    D[-2, -gulley_x:] = np.linspace(0, side_fill_value, gulley_x)[::-1]
-    D[-gulley_y:, -2] = np.linspace(0, side_fill_value, gulley_y)[::-1]
+    D[-1, -gulley_x:] += np.linspace(0, side_fill_value, gulley_x)[::-1]
+    D[-gulley_y:, -1] += np.linspace(0, side_fill_value, gulley_y)[::-1]
     # After the ramp, just fill in the max til the end
-    D[1, gulley_x:] = side_fill_value    
-    D[gulley_y:, 1] = side_fill_value    
-    D[-2, :-gulley_x] = side_fill_value
-    D[:-gulley_y, -2] = side_fill_value  
+    D[0, gulley_x:] += side_fill_value    
+    D[gulley_y:, 0] += side_fill_value    
+    D[-1, :-gulley_x] += side_fill_value
+    D[:-gulley_y, -1] += side_fill_value  
     # Finally, populate the middle of the matrix with the local costs
-    D[1:(M.shape[0] + 1), 1:(M.shape[1] + 1)] = M
-    # Finally, fill in infinity for the edges
-    D[:, 0] = np.inf
-    D[0, :] = np.inf
-    D[:, -1] = np.inf
-    D[-1, :] = np.inf
-    D[0, 0] = 0
-    D[-1, -1] = 0
+    D += M
     
     # Store the traceback
     phi = np.zeros(D.shape)
+    # Handle first row/column, where we force back to the beginning
+    D[0, :] = np.cumsum(D[0, :])
+    D[:, 0] = np.cumsum(D[:, 0])
+    phi[0, :] = 2
+    phi[:, 0] = 1
+    phi[0, 0] = 0   
+    # Handle final row/column, where we force starting at bottom right corner
+    #D[-1, ::-1] = np.cumsum(D[-1, ::-1])    
+    #D[::-1, -1] = np.cumsum(D[::-1, -1])
     
     for i in xrange(D.shape[0] - 1): 
         for j in xrange(D.shape[1] - 1):
             # The possible locations we can move to, weighted by penalty score
-            next_moves = [D[i, j], pen*D[i, j+1], pen*D[i+1, j]]
+            next_moves = [D[i, j], pen*D[i, j + 1], pen*D[i + 1, j]]
             # Choose the lowest cost
             tb = np.argmin(next_moves)
             dmin = next_moves[tb]
             # Add in the cost
             D[i + 1, j + 1] = D[i + 1, j + 1] + dmin
             # Store the traceback
-            phi[i, j] = tb
+            phi[i + 1, j + 1] = tb
     
+        
     # Traceback from corner
-    i = D.shape[0] - 3
-    j = D.shape[1] - 3
+    i = np.argmin(D[:, -1])
+    j = np.argmin(D[-1, :])
+    if D[i, -1] < D[-1, j]:
+        j = D.shape[1] - 1
+    else:
+        i = D.shape[0] - 1
     
     # Score is the final score of the best path
     score = D[i, j]
@@ -85,7 +92,7 @@ def dpmod(M, pen=1.0, G=0.0):
     q = np.array([j])
     
     # Until we reach an edge
-    while i > 2 and j > 2:
+    while i > 0 or j > 0:
         # If the tracback matrix indicates a diagonal move...
         if phi[i, j] == 0:
             i = i - 1
@@ -99,13 +106,7 @@ def dpmod(M, pen=1.0, G=0.0):
         # Add these indices into the path arrays
         p = np.append(i, p)
         q = np.append(j, q)
-    
-    p -= 2
-    q -= 2
-    
-    # Strip off the edges of the D matrix before returning
-    #D = D[1:M.shape[0],1:M.shape[1]]
-    
+        
     # Normalize score
     score = score/q.shape[0]
     
@@ -180,19 +181,25 @@ def align_midi(midi, midi_audio, audio, fs):
     midi_beats = np.array(np.interp(np.linspace(0, scale*(midi_beats.shape[0] - 1), scale*(midi_beats.shape[0] - 1) + 1),
                                     np.linspace(0, scale*(midi_beats.shape[0] - 1), midi_beats.shape[0]),
                                     midi_beats), dtype=np.int)
+    # Truncate to length of audio
+    midi_beats = midi_beats[midi_beats < midi_gram.shape[1]]
     # Synchronize the log-fs gram with MIDI beats
     midi_gram = librosa.feature.sync(midi_gram, midi_beats)[:, 1:]
     # Compute log-amplitude spectrogram
     midi_gram = librosa.logamplitude(midi_gram, ref_power=midi_gram.max())
     
+    # Use harmonic part for gram, percussive part for beats
+    H, P = librosa.decompose.hpss(librosa.stft(audio))
+    audio_harmonic = librosa.istft(H)
+    audio_percussive = librosa.istft(P)
     # Compute log-frequency spectrogram of original audio
-    audio_gram = np.abs(librosa.cqt(y=audio,
+    audio_gram = np.abs(librosa.cqt(y=audio_harmonic,
                                     sr=fs,
                                     hop_length=512,
                                     fmin=librosa.midi_to_hz(36),
                                     n_bins=60))**2
     # Beat track the audio file
-    audio_beats = librosa.beat.beat_track(audio, hop_length=128, bpm=midi_tempo)[1]/4
+    audio_beats = librosa.beat.beat_track(audio_percussive, hop_length=128, bpm=midi_tempo)[1]/4
     # Synchronize the log frequency spectrogram to the beat times
     audio_gram = librosa.feature.sync(audio_gram, audio_beats)[:, 1:]
     # Compute log-amplitude spectrogram
@@ -223,7 +230,7 @@ def align_midi(midi, midi_audio, audio, fs):
     similarity_matrix = scipy.spatial.distance.cdist(midi_gram_normalized.T, audio_gram_normalized.T, metric='seuclidean')
     
     # Get best path through matrix
-    p, q, D, phi, score = dpmod(similarity_matrix**2, 1.001, 1.)
+    p, q, D, phi, score = dpmod(similarity_matrix**2, 1.01, 0.)
     # Plot similarity matrix and best path through it
     ax = plt.subplot2grid((4, 2), (2, 0), rowspan=2)
     plt.imshow(similarity_matrix.T,
@@ -231,7 +238,7 @@ def align_midi(midi, midi_audio, audio, fs):
                interpolation='nearest',
                cmap=plt.cm.gray)
     tight = plt.axis()
-    plt.plot(p, q, 'r.')
+    plt.plot(p, q, 'r.', ms=.2)
     plt.axis(tight)
     plt.title('Similarity matrix and lowest-cost path, cost={}'.format(score))
     
@@ -275,9 +282,9 @@ if __name__ == '__main__':
     import joblib
     import os
     SF2_PATH = '../Performer Synchronization Measure/SGM-V2.01.sf2'
-    OUTPUT_PATH = 'midi-aligned-new-dpmod'
-    if not os.path.exists(OUTPUT_PATH):
-        os.makedirs(OUTPUT_PATH)
+    OUTPUT_PATH = 'midi-aligned-new-new-dpmod'
+    if not os.path.exists(os.path.join('data/cal500/', OUTPUT_PATH)):
+        os.makedirs(os.path.join('data/cal500/', OUTPUT_PATH))
     
     def process_one_file(filename):
         '''
