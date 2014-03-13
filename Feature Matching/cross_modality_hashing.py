@@ -99,16 +99,16 @@ class MLP_two_inputs(object):
 # <codecell>
 
 # Dimensionality of hamming space
-n_bits = 12
+n_bits = 8
 # First neural net, for chroma vectors
 chroma_p = T.matrix('chroma_p')
 chroma_n = T.matrix('chroma_n')
 # Number and size of layers chosen somewhat arbitrarily
-chroma_net = MLP_two_inputs(chroma_p, chroma_n, [12, 20, n_bits])
+chroma_net = MLP_two_inputs(chroma_p, chroma_n, [12, 20, 20, n_bits])
 # Second neural net, for MIDI piano roll
 piano_roll_p = T.matrix('piano_roll_p')
 piano_roll_n = T.matrix('piano_roll_n')
-piano_roll_net = MLP_two_inputs(piano_roll_p, piano_roll_n, [128, 160, n_bits])
+piano_roll_net = MLP_two_inputs(piano_roll_p, piano_roll_n, [128, 160, 160, n_bits])
 
 # <markdowncell>
 
@@ -129,7 +129,7 @@ cost = .5*T.sum((chroma_net.layers_p[-1].output - piano_roll_net.layers_p[-1].ou
 
 # List of update steps for each parameter
 updates = []
-learning_rate = 1e-5
+learning_rate = 1e-4
 # Just gradient descent on cost
 for param in chroma_net.params + piano_roll_net.params:
     updates.append((param, param - learning_rate*T.grad(cost, param)))
@@ -145,6 +145,8 @@ piano_roll_eval = theano.function([piano_roll_p], piano_roll_net.layers_p[-1].ou
 if __name__=='__main__':
     import glob
     import matplotlib.pyplot as plt
+    from IPython import display
+    
     def load_data(directory):
         ''' Load in all chroma matrices and piano rolls and output them as separate matrices '''
         X = []
@@ -154,31 +156,43 @@ if __name__=='__main__':
             piano_roll_filename = chroma_filename.replace('chroma', 'piano_roll')
             Y += [np.load(piano_roll_filename)]
         return np.hstack(X), np.hstack(Y)
-    def random_dissimilar_points(X, Y, n=4):
-        ''' Get "negative examples" by randomly permuting the dataset against itself '''
-        X_repeated = np.repeat(X, n, axis=1)
-        shuffled_columns = np.repeat(np.arange(Y.shape[1]), n)
-        np.random.shuffle(shuffled_columns)
-        return X_repeated, Y[:, shuffled_columns]
+    
+    def get_minibatch(X, Y, size=100):
+        ''' Grabs random positive examples and creates fake negative examples '''
+        indices = np.arange(X.shape[1])
+        p = np.random.choice(indices, size, replace=False)
+        n_X = np.random.choice(indices, size, replace=False)
+        n_Y = np.random.choice(indices[np.logical_not(np.in1d(indices, n_X))], size, replace=False)
+        return X[:, p], X[:, n_X], Y[:, p], Y[:, n_Y]
+    
+    def standardize(X):
+        ''' Standardize the rows of a data matrix X '''
+        std = np.std(X, axis=1).reshape(-1, 1)
+        return (X - np.mean(X, axis=1).reshape(-1, 1))/(std + (std == 0))
+        
     
     # Load in the data
     chroma_data_p, piano_roll_data_p = load_data('../data/theano_test/')
-    # COnstruct a fake negative example set
-    chroma_data_n, piano_roll_data_n = random_dissimilar_points(chroma_data_p, piano_roll_data_p)
-
+    
+    # Standardize
+    chroma_data_p = standardize(chroma_data_p)
+    piano_roll_data_p = standardize(piano_roll_data_p)
+    
     # Randomly select some data vectors to plot every so often
     plot_indices = np.random.randint(0, piano_roll_data_p.shape[1], 20)
     
     # Value of m_{XY} to use
     m_val = 2
     
-    # 1000 iterations of training
-    for n in xrange(1000):
-        current_cost = train(chroma_data_p, chroma_data_n, piano_roll_data_p, piano_roll_data_n, m_val)
-        # Every 100 iterations, print the cost and plot some diagnostic figures
+    X_p, X_n, Y_p, Y_n = get_minibatch(chroma_data_p, piano_roll_data_p)
+
+    for n in xrange(100000):
+        current_cost = train(X_p, X_n, Y_p, Y_n, m_val)
+        # Every so many, print the cost and plot some diagnostic figures
         if not n % 100:
+            X_p, X_n, Y_p, Y_n = get_minibatch(chroma_data_p, piano_roll_data_p)
+            display.clear_output()
             print current_cost
-            chroma_data_n, piano_roll_data_n = random_dissimilar_points(chroma_data_p, piano_roll_data_p)
             plt.figure(figsize=(18, 2))
             plt.subplot(151)
             plt.imshow(piano_roll_eval(piano_roll_data_p[:, plot_indices]), aspect='auto', interpolation='nearest')
