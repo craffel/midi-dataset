@@ -104,11 +104,11 @@ n_bits = 8
 chroma_p = T.matrix('chroma_p')
 chroma_n = T.matrix('chroma_n')
 # Number and size of layers chosen somewhat arbitrarily
-chroma_net = MLP_two_inputs(chroma_p, chroma_n, [12, 20, 20, n_bits])
+chroma_net = MLP_two_inputs(chroma_p, chroma_n, [48, 64, 64, n_bits])
 # Second neural net, for MIDI piano roll
 piano_roll_p = T.matrix('piano_roll_p')
 piano_roll_n = T.matrix('piano_roll_n')
-piano_roll_net = MLP_two_inputs(piano_roll_p, piano_roll_n, [128, 160, 160, n_bits])
+piano_roll_net = MLP_two_inputs(piano_roll_p, piano_roll_n, [192, 256, 256, n_bits])
 
 # <markdowncell>
 
@@ -129,7 +129,7 @@ cost = .5*T.sum((chroma_net.layers_p[-1].output - piano_roll_net.layers_p[-1].ou
 
 # List of update steps for each parameter
 updates = []
-learning_rate = 1e-4
+learning_rate = 1e-3
 # Just gradient descent on cost
 for param in chroma_net.params + piano_roll_net.params:
     updates.append((param, param - learning_rate*T.grad(cost, param)))
@@ -147,29 +147,50 @@ if __name__=='__main__':
     import matplotlib.pyplot as plt
     from IPython import display
     
+    def shingle(x, stacks):
+        ''' Shingle a matrix column-wise '''
+        return np.vstack([x[:, n:(x.shape[1] - stacks + n)] for n in xrange(stacks)])
+
     def load_data(directory):
         ''' Load in all chroma matrices and piano rolls and output them as separate matrices '''
         X = []
         Y = []
         for chroma_filename in glob.glob(directory + '*-chroma.npy'):
-            X += [np.load(chroma_filename)]
+            X += [shingle(np.load(chroma_filename), 4)]
             piano_roll_filename = chroma_filename.replace('chroma', 'piano_roll')
-            Y += [np.load(piano_roll_filename)]
+            Y += [shingle(np.load(piano_roll_filename)[36:84, :], 4)]
         return np.hstack(X), np.hstack(Y)
     
-    def get_minibatch(X, Y, size=100):
-        ''' Grabs random positive examples and creates fake negative examples '''
-        indices = np.arange(X.shape[1])
-        p = np.random.choice(indices, size, replace=False)
-        n_X = np.random.choice(indices, size, replace=False)
-        n_Y = np.random.choice(indices[np.logical_not(np.in1d(indices, n_X))], size, replace=False)
-        return X[:, p], X[:, n_X], Y[:, p], Y[:, n_Y]
+    def get_next_batch(X, Y, batch_size, n_iter):
+        ''' Fast (hopefully) random mini batch generator '''
+        n_batches = int(np.floor(X.shape[1]/batch_size))
+        current_batch = n_batches
+        for n in xrange(n_iter):
+            if current_batch >= n_batches:
+                positive_shuffle = np.random.permutation(X.shape[1])
+                negative_shuffle = np.random.permutation(X.shape[1])
+                X_p = X[:, positive_shuffle]
+                Y_p = Y[:, positive_shuffle]
+                X_n = X[:, negative_shuffle]
+                Y_n = Y[:, np.roll(negative_shuffle, 1)]
+                current_batch = 0
+            batch = np.r_[current_batch*batch_size:(current_batch + 1)*batch_size]
+            yield X_p[:, batch], Y_p[:, batch], X_n[:, batch], Y_n[:, batch]
+            current_batch += 1
     
     def standardize(X):
         ''' Standardize the rows of a data matrix X '''
         std = np.std(X, axis=1).reshape(-1, 1)
         return (X - np.mean(X, axis=1).reshape(-1, 1))/(std + (std == 0))
-        
+      
+    def hashes_used(X):
+        ''' Get the number of unique hashes actually used '''
+        return np.unique(np.sum(2**np.arange(X.shape[0]).reshape(-1, 1)*X, axis=0)).shape[0]
+
+    def count_errors(X, Y):
+        ''' Computes the number of correctly encoded codeworks and the number of bit errors made '''
+        points_equal = (X == Y)
+        return np.all(points_equal, axis=0).sum(), np.logical_not(points_equal).sum(), hashes_used(X), hashes_used(Y)
     
     # Load in the data
     chroma_data_p, piano_roll_data_p = load_data('../data/theano_test/')
@@ -182,17 +203,20 @@ if __name__=='__main__':
     plot_indices = np.random.randint(0, piano_roll_data_p.shape[1], 20)
     
     # Value of m_{XY} to use
-    m_val = 2
+    m_val = 4
     
-    X_p, X_n, Y_p, Y_n = get_minibatch(chroma_data_p, piano_roll_data_p)
-
-    for n in xrange(100000):
+    for n, (X_p, Y_p, X_n, Y_n) in enumerate(get_next_batch(chroma_data_p, piano_roll_data_p, 100, int(1e8))):
         current_cost = train(X_p, X_n, Y_p, Y_n, m_val)
         # Every so many, print the cost and plot some diagnostic figures
-        if not n % 100:
-            X_p, X_n, Y_p, Y_n = get_minibatch(chroma_data_p, piano_roll_data_p)
+        if not n % 1000:
             display.clear_output()
-            print current_cost
+            correct, errors, hashes_X, hashes_Y = count_errors(piano_roll_eval(piano_roll_data_p) > 0, 
+                                                               chroma_eval(chroma_data_p) > 0)
+            print "Itertation {}".format(n)
+            print "Cost: {}".format(current_cost)
+            print "{} of {} vectors hashed correctly".format(correct, piano_roll_data_p.shape[1])
+            print "{} of {} bits incorrect".format(errors, piano_roll_data_p.shape[1]*n_bits)
+            print "{}, {} of {} possible hashes used".format(hashes_X, hashes_Y, 2**n_bits)
             plt.figure(figsize=(18, 2))
             plt.subplot(151)
             plt.imshow(piano_roll_eval(piano_roll_data_p[:, plot_indices]), aspect='auto', interpolation='nearest')
