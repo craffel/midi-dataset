@@ -101,14 +101,14 @@ class MLP_two_inputs(object):
 # Dimensionality of hamming space
 n_bits = 8
 # First neural net, for chroma vectors
-chroma_p = T.matrix('chroma_p')
-chroma_n = T.matrix('chroma_n')
+X_p_input = T.matrix('X_p_input')
+X_n_input = T.matrix('X_n_input')
 # Number and size of layers chosen somewhat arbitrarily
-chroma_net = MLP_two_inputs(chroma_p, chroma_n, [100, 128, 128, n_bits])
+X_net = MLP_two_inputs(X_p_input, X_n_input, [100, 128, 128, n_bits])
 # Second neural net, for MIDI piano roll
-piano_roll_p = T.matrix('piano_roll_p')
-piano_roll_n = T.matrix('piano_roll_n')
-piano_roll_net = MLP_two_inputs(piano_roll_p, piano_roll_n, [192, 256, 256, n_bits])
+Y_p_input = T.matrix('Y_p_input')
+Y_n_input = T.matrix('Y_n_input')
+Y_net = MLP_two_inputs(Y_p_input, Y_n_input, [192, 256, 256, n_bits])
 
 # <markdowncell>
 
@@ -124,21 +124,21 @@ piano_roll_net = MLP_two_inputs(piano_roll_p, piano_roll_n, [192, 256, 256, n_bi
 # Threshold parameter
 m = T.scalar('m')
 # Compute cost function as described above
-cost = .5*T.sum((chroma_net.layers_p[-1].output - piano_roll_net.layers_p[-1].output)**2) \
-     + .5*T.sum(T.maximum(0, m - T.sqrt(T.sum((chroma_net.layers_n[-1].output - piano_roll_net.layers_n[-1].output)**2, axis=0)))**2)
+cost = .5*T.sum((X_net.layers_p[-1].output - Y_net.layers_p[-1].output)**2) \
+     + .5*T.sum(T.maximum(0, m - T.sqrt(T.sum((X_net.layers_n[-1].output - Y_net.layers_n[-1].output)**2, axis=0)))**2)
 
 # List of update steps for each parameter
 updates = []
 learning_rate = 1e-3
 # Just gradient descent on cost
-for param in chroma_net.params + piano_roll_net.params:
+for param in X_net.params + Y_net.params:
     updates.append((param, param - learning_rate*T.grad(cost, param)))
 
 # Function for optimizing the neural net parameters, by minimizing cost
-train = theano.function([chroma_p, chroma_n, piano_roll_p, piano_roll_n, m], cost, updates=updates)
+train = theano.function([X_p_input, X_n_input, Y_p_input, Y_n_input, m], cost, updates=updates)
 # Functions for actually computing the output of each neural net
-chroma_eval = theano.function([chroma_p], chroma_net.layers_p[-1].output)
-piano_roll_eval = theano.function([piano_roll_p], piano_roll_net.layers_p[-1].output)
+X_eval = theano.function([X_p_input], X_net.layers_p[-1].output)
+Y_eval = theano.function([Y_p_input], Y_net.layers_p[-1].output)
 
 # <codecell>
 
@@ -160,7 +160,7 @@ if __name__=='__main__':
             piano_roll_filename = chroma_filename.replace('msd', 'midi')
             Y += [shingle(np.load(piano_roll_filename), 4)]
         return np.hstack(X), np.hstack(Y)
-    
+        
     def get_next_batch(X, Y, batch_size, n_iter):
         ''' Fast (hopefully) random mini batch generator '''
         n_batches = int(np.floor(X.shape[1]/batch_size))
@@ -177,7 +177,7 @@ if __name__=='__main__':
             batch = np.r_[current_batch*batch_size:(current_batch + 1)*batch_size]
             yield X_p[:, batch], Y_p[:, batch], X_n[:, batch], Y_n[:, batch]
             current_batch += 1
-    
+
     def standardize(X):
         ''' Standardize the rows of a data matrix X '''
         std = np.std(X, axis=1).reshape(-1, 1)
@@ -193,46 +193,81 @@ if __name__=='__main__':
         return np.all(points_equal, axis=0).sum(), np.logical_not(points_equal).sum(), hashes_used(X), hashes_used(Y)
     
     # Load in the data
-    chroma_data_p, piano_roll_data_p = load_data('data/hash_dataset/')
+    X, Y = load_data('data/hash_dataset/')
     
     # Standardize
-    chroma_data_p = standardize(chroma_data_p)
-    piano_roll_data_p = standardize(piano_roll_data_p)
+    X = standardize(X)
+    Y = standardize(Y)
+    
+    # Split into .8 train/test indices
+    train_indices = np.random.sample(X.shape[1]) < .8
+    X_train = np.array(X[:, train_indices])
+    Y_train = np.array(Y[:, train_indices])
+    validate_indices = np.logical_not(train_indices)
+    X_validate = np.array(X[:, validate_indices])
+    Y_validate = np.array(Y[:, validate_indices])
     
     # Randomly select some data vectors to plot every so often
-    plot_indices = np.random.randint(0, piano_roll_data_p.shape[1], 20)
+    plot_indices_train = np.random.randint(0, X_train.shape[1], 20)
+    plot_indices_validate = np.random.randint(0, X_validate.shape[1], 20)
     
     # Value of m_{XY} to use
     m_val = 4
     
-    for n, (X_p, Y_p, X_n, Y_n) in enumerate(get_next_batch(chroma_data_p, piano_roll_data_p, 100, int(1e8))):
+    for n, (X_p, Y_p, X_n, Y_n) in enumerate(get_next_batch(X_train, Y_train, 100, int(1e8))):
         current_cost = train(X_p, X_n, Y_p, Y_n, m_val)
         # Every so many, print the cost and plot some diagnostic figures
         if not n % 1000:
             display.clear_output()
-            correct, errors, hashes_X, hashes_Y = count_errors(piano_roll_eval(piano_roll_data_p) > 0, 
-                                                               chroma_eval(chroma_data_p) > 0)
+            correct, errors, hashes_X, hashes_Y = count_errors(Y_eval(Y_train) > 0, 
+                                                               X_eval(X_train) > 0)
             print "Itertation {}".format(n)
             print "Cost: {}".format(current_cost)
-            print "{} of {} vectors hashed correctly".format(correct, piano_roll_data_p.shape[1])
-            print "{} of {} bits incorrect".format(errors, piano_roll_data_p.shape[1]*n_bits)
-            print "{}, {} of {} possible hashes used".format(hashes_X, hashes_Y, 2**n_bits)
+            print "Train:"
+            print "     {} of {} vectors hashed correctly".format(correct, X_train.shape[1])
+            print "     {} of {} bits incorrect".format(errors, X_train.shape[1]*n_bits)
+            print "     {}, {} of {} possible hashes used".format(hashes_X, hashes_Y, 2**n_bits)
             plt.figure(figsize=(18, 2))
             plt.subplot(151)
-            plt.imshow(piano_roll_eval(piano_roll_data_p[:, plot_indices]),
+            plt.imshow(Y_eval(Y_train[:, plot_indices_train]),
                        aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
             plt.subplot(152)
-            plt.imshow(chroma_eval(chroma_data_p[:, plot_indices]),
+            plt.imshow(X_eval(X_train[:, plot_indices_train]),
                        aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
             plt.subplot(153)
-            plt.imshow(piano_roll_eval(piano_roll_data_p[:, plot_indices]) > 0,
+            plt.imshow(Y_eval(Y_train[:, plot_indices_train]) > 0,
                        aspect='auto', interpolation='nearest', cmap=plt.cm.cool)
             plt.subplot(154)
-            plt.imshow(chroma_eval(chroma_data_p[:, plot_indices]) > 0,
+            plt.imshow(X_eval(X_train[:, plot_indices_train]) > 0,
                        aspect='auto', interpolation='nearest', cmap=plt.cm.cool)
             plt.subplot(155)
-            plt.imshow(np.not_equal(chroma_eval(chroma_data_p[:, plot_indices]) > 0,
-                                    piano_roll_eval(piano_roll_data_p[:, plot_indices]) > 0),
+            plt.imshow(np.not_equal(X_eval(X_train[:, plot_indices_train]) > 0,
+                                    Y_eval(Y_train[:, plot_indices_train]) > 0),
+                       aspect='auto', interpolation='nearest', cmap=plt.cm.cool)
+            plt.show()
+            
+            correct, errors, hashes_X, hashes_Y = count_errors(Y_eval(Y_validate) > 0, 
+                                                               X_eval(X_validate) > 0)
+            print "Validate:"
+            print "     {} of {} vectors hashed correctly".format(correct, X_validate.shape[1])
+            print "     {} of {} bits incorrect".format(errors, X_validate.shape[1]*n_bits)
+            print "     {}, {} of {} possible hashes used".format(hashes_X, hashes_Y, 2**n_bits)
+            plt.figure(figsize=(18, 2))
+            plt.subplot(151)
+            plt.imshow(Y_eval(Y_validate[:, plot_indices_validate]),
+                       aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
+            plt.subplot(152)
+            plt.imshow(X_eval(X_validate[:, plot_indices_validate]),
+                       aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
+            plt.subplot(153)
+            plt.imshow(Y_eval(Y_validate[:, plot_indices_validate]) > 0,
+                       aspect='auto', interpolation='nearest', cmap=plt.cm.cool)
+            plt.subplot(154)
+            plt.imshow(X_eval(X_validate[:, plot_indices_validate]) > 0,
+                       aspect='auto', interpolation='nearest', cmap=plt.cm.cool)
+            plt.subplot(155)
+            plt.imshow(np.not_equal(X_eval(X_validate[:, plot_indices_validate]) > 0,
+                                    Y_eval(Y_validate[:, plot_indices_validate]) > 0),
                        aspect='auto', interpolation='nearest', cmap=plt.cm.cool)
             plt.show()
 
