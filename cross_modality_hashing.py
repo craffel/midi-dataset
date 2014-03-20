@@ -104,7 +104,7 @@ n_bits = 8
 chroma_p = T.matrix('chroma_p')
 chroma_n = T.matrix('chroma_n')
 # Number and size of layers chosen somewhat arbitrarily
-chroma_net = MLP_two_inputs(chroma_p, chroma_n, [48, 64, 64, n_bits])
+chroma_net = MLP_two_inputs(chroma_p, chroma_n, [100, 128, 128, n_bits])
 # Second neural net, for MIDI piano roll
 piano_roll_p = T.matrix('piano_roll_p')
 piano_roll_n = T.matrix('piano_roll_n')
@@ -155,10 +155,10 @@ if __name__=='__main__':
         ''' Load in all chroma matrices and piano rolls and output them as separate matrices '''
         X = []
         Y = []
-        for chroma_filename in glob.glob(directory + '*-chroma.npy'):
+        for chroma_filename in glob.glob(directory + '*-msd.npy'):
             X += [shingle(np.load(chroma_filename), 4)]
-            piano_roll_filename = chroma_filename.replace('chroma', 'piano_roll')
-            Y += [shingle(np.load(piano_roll_filename)[36:84, :], 4)]
+            piano_roll_filename = chroma_filename.replace('msd', 'midi')
+            Y += [shingle(np.load(piano_roll_filename), 4)]
         return np.hstack(X), np.hstack(Y)
     
     def get_next_batch(X, Y, batch_size, n_iter):
@@ -193,7 +193,7 @@ if __name__=='__main__':
         return np.all(points_equal, axis=0).sum(), np.logical_not(points_equal).sum(), hashes_used(X), hashes_used(Y)
     
     # Load in the data
-    chroma_data_p, piano_roll_data_p = load_data('../data/theano_test/')
+    chroma_data_p, piano_roll_data_p = load_data('data/hash_dataset/')
     
     # Standardize
     chroma_data_p = standardize(chroma_data_p)
@@ -219,9 +219,11 @@ if __name__=='__main__':
             print "{}, {} of {} possible hashes used".format(hashes_X, hashes_Y, 2**n_bits)
             plt.figure(figsize=(18, 2))
             plt.subplot(151)
-            plt.imshow(piano_roll_eval(piano_roll_data_p[:, plot_indices]), aspect='auto', interpolation='nearest')
+            plt.imshow(piano_roll_eval(piano_roll_data_p[:, plot_indices]),
+                       aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
             plt.subplot(152)
-            plt.imshow(chroma_eval(chroma_data_p[:, plot_indices]), aspect='auto', interpolation='nearest', )
+            plt.imshow(chroma_eval(chroma_data_p[:, plot_indices]),
+                       aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
             plt.subplot(153)
             plt.imshow(piano_roll_eval(piano_roll_data_p[:, plot_indices]) > 0,
                        aspect='auto', interpolation='nearest', cmap=plt.cm.cool)
