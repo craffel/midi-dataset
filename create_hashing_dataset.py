@@ -102,7 +102,3 @@ if __name__=='__main__':
         np.save(os.path.join(output_path, filename.replace('.mp3', '-msd.npy')), msd_features)
         np.save(os.path.join(output_path, filename.replace('.mp3', '-midi.npy')), piano_roll)
 
-# <codecell>
-
-np.load('data/hash_dataset/A-Ha - Take On Me-msd.npy').shape
-
