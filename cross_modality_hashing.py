@@ -142,10 +142,6 @@ Y_eval = theano.function([Y_p_input], Y_net.layers_p[-1].output)
 
 # <codecell>
 
-print "{:.3f}".format(10)
-
-# <codecell>
-
 if __name__=='__main__':
     import glob
     import matplotlib.pyplot as plt
@@ -220,26 +216,29 @@ if __name__=='__main__':
     
     for n, (X_p, Y_p, X_n, Y_n) in enumerate(get_next_batch(X_train, Y_train, 100, int(1e8))):
         current_cost = train(X_p, X_n, Y_p, Y_n, m_val)
-        # Every so many, print the cost and plot some diagnostic figures
+        # Every so many iterations, print the cost and plot some diagnostic figures
         if not n % 1000:
             display.clear_output()
             print "Itertation {}".format(n)
             print "Cost: {}".format(current_cost)
             
+            # Get accuracy and diagnostic figures for both train and validation sets
             for name, X_set, Y_set, plot_indices in [('Train', X_train, Y_train, plot_indices_train),
                                                      ('Validate', X_validate, Y_validate, plot_indices_validate)]:
                 print 
                 print name
+                # Get the network output for this dataset
                 X_output = X_eval(X_set)
                 Y_output = Y_eval(Y_set)
-                correct, errors, hashes_X, hashes_Y = count_errors(Y_output > 0, 
-                                                                   X_output > 0)
+                # Compute and display metrics on the resulting hashes
+                correct, errors, hashes_X, hashes_Y = count_errors(Y_output > 0, X_output > 0)
                 N = X_set.shape[1]
                 print "  {}/{} = {:.3f}% vectors hashed correctly".format(correct, N, correct/(1.*N)*100)
                 print "  {}/{} = {:.3f}% bits incorrect".format(errors, N*n_bits, errors/(1.*N*n_bits)*100)
                 print "  {}, {} of {} possible hashes used".format(hashes_X, hashes_Y, 2**n_bits)
-                plt.figure(figsize=(18, 2))
                 
+                plt.figure(figsize=(18, 2))
+                # Show images of each networks output, binaraized and nonbinarized, and the error
                 for n, image in enumerate([Y_output[:, plot_indices],
                                            X_output[:, plot_indices],
                                            Y_output[:, plot_indices] > 0,
