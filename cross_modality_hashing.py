@@ -142,6 +142,10 @@ Y_eval = theano.function([Y_p_input], Y_net.layers_p[-1].output)
 
 # <codecell>
 
+print "{:.3f}".format(10)
+
+# <codecell>
+
 if __name__=='__main__':
     import glob
     import matplotlib.pyplot as plt
@@ -230,8 +234,9 @@ if __name__=='__main__':
                 Y_output = Y_eval(Y_set)
                 correct, errors, hashes_X, hashes_Y = count_errors(Y_output > 0, 
                                                                    X_output > 0)
-                print "  {} of {} vectors hashed correctly".format(correct, X_set.shape[1])
-                print "  {} of {} bits incorrect".format(errors, X_set.shape[1]*n_bits)
+                N = X_set.shape[1]
+                print "  {}/{} = {:.3f}% vectors hashed correctly".format(correct, N, correct/(1.*N)*100)
+                print "  {}/{} = {:.3f}% bits incorrect".format(errors, N*n_bits, errors/(1.*N*n_bits)*100)
                 print "  {}, {} of {} possible hashes used".format(hashes_X, hashes_Y, 2**n_bits)
                 plt.figure(figsize=(18, 2))
                 
