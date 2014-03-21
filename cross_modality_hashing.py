@@ -219,55 +219,28 @@ if __name__=='__main__':
         # Every so many, print the cost and plot some diagnostic figures
         if not n % 1000:
             display.clear_output()
-            correct, errors, hashes_X, hashes_Y = count_errors(Y_eval(Y_train) > 0, 
-                                                               X_eval(X_train) > 0)
             print "Itertation {}".format(n)
             print "Cost: {}".format(current_cost)
-            print "Train:"
-            print "     {} of {} vectors hashed correctly".format(correct, X_train.shape[1])
-            print "     {} of {} bits incorrect".format(errors, X_train.shape[1]*n_bits)
-            print "     {}, {} of {} possible hashes used".format(hashes_X, hashes_Y, 2**n_bits)
-            plt.figure(figsize=(18, 2))
-            plt.subplot(151)
-            plt.imshow(Y_eval(Y_train[:, plot_indices_train]),
-                       aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
-            plt.subplot(152)
-            plt.imshow(X_eval(X_train[:, plot_indices_train]),
-                       aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
-            plt.subplot(153)
-            plt.imshow(Y_eval(Y_train[:, plot_indices_train]) > 0,
-                       aspect='auto', interpolation='nearest', cmap=plt.cm.cool)
-            plt.subplot(154)
-            plt.imshow(X_eval(X_train[:, plot_indices_train]) > 0,
-                       aspect='auto', interpolation='nearest', cmap=plt.cm.cool)
-            plt.subplot(155)
-            plt.imshow(np.not_equal(X_eval(X_train[:, plot_indices_train]) > 0,
-                                    Y_eval(Y_train[:, plot_indices_train]) > 0),
-                       aspect='auto', interpolation='nearest', cmap=plt.cm.cool)
-            plt.show()
             
-            correct, errors, hashes_X, hashes_Y = count_errors(Y_eval(Y_validate) > 0, 
-                                                               X_eval(X_validate) > 0)
-            print "Validate:"
-            print "     {} of {} vectors hashed correctly".format(correct, X_validate.shape[1])
-            print "     {} of {} bits incorrect".format(errors, X_validate.shape[1]*n_bits)
-            print "     {}, {} of {} possible hashes used".format(hashes_X, hashes_Y, 2**n_bits)
-            plt.figure(figsize=(18, 2))
-            plt.subplot(151)
-            plt.imshow(Y_eval(Y_validate[:, plot_indices_validate]),
-                       aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
-            plt.subplot(152)
-            plt.imshow(X_eval(X_validate[:, plot_indices_validate]),
-                       aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
-            plt.subplot(153)
-            plt.imshow(Y_eval(Y_validate[:, plot_indices_validate]) > 0,
-                       aspect='auto', interpolation='nearest', cmap=plt.cm.cool)
-            plt.subplot(154)
-            plt.imshow(X_eval(X_validate[:, plot_indices_validate]) > 0,
-                       aspect='auto', interpolation='nearest', cmap=plt.cm.cool)
-            plt.subplot(155)
-            plt.imshow(np.not_equal(X_eval(X_validate[:, plot_indices_validate]) > 0,
-                                    Y_eval(Y_validate[:, plot_indices_validate]) > 0),
-                       aspect='auto', interpolation='nearest', cmap=plt.cm.cool)
+            for name, X_set, Y_set, plot_indices in [('Train', X_train, Y_train, plot_indices_train),
+                                                     ('Validate', X_validate, Y_validate, plot_indices_validate)]:
+                print 
+                print name
+                X_output = X_eval(X_set)
+                Y_output = Y_eval(Y_set)
+                correct, errors, hashes_X, hashes_Y = count_errors(Y_output > 0, 
+                                                                   X_output > 0)
+                print "  {} of {} vectors hashed correctly".format(correct, X_set.shape[1])
+                print "  {} of {} bits incorrect".format(errors, X_set.shape[1]*n_bits)
+                print "  {}, {} of {} possible hashes used".format(hashes_X, hashes_Y, 2**n_bits)
+                plt.figure(figsize=(18, 2))
+                
+                for n, image in enumerate([Y_output[:, plot_indices],
+                                           X_output[:, plot_indices],
+                                           Y_output[:, plot_indices] > 0,
+                                           X_output[:, plot_indices] > 0,
+                                           np.not_equal(X_output[:, plot_indices] > 0, Y_output[:, plot_indices] > 0)]):
+                    plt.subplot(1, 5, n + 1)
+                    plt.imshow(image, aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
             plt.show()
 
