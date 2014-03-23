@@ -12,62 +12,38 @@ import copy
 
 # <codecell>
 
-def dpmod(M, pen=1.0, G=0.0):
+def dpmod(M, pen=None):
     '''
     Use dynamic programming to find a min-cost path through matrix M.
     
     Input:
         M - Matrix to find path through
-        pen - cost scale for for (0,1) and (1,0) steps (default 1.0)
-        G - acceptable "gullies" (0..1, default 0)
+        pen - additional cost for for (0,1) and (1,0) steps, default None which means np.median(M)
     Output:
         p, q - State sequence
-        D - Cost matrix
-        phi - Backtrace
         score - DP score
     '''
     
-    side_fill_value = 2*M.max()
+    # Set penality = median(M) if none was provided
+    if pen is None:
+        pen = np.median(M)
     
-    # Matrix of costs, with an additional row and column at the beginning and end
-    D = np.zeros(M.shape)
-    # Compute size of gulley in rows and columns
-    gulley_x = int(round(G*M.shape[1]))
-    gulley_y = int(round(G*M.shape[0]))
-    # Must be at least 1 for the logic below to work
-    gulley_x += (gulley_x == 0)
-    gulley_y += (gulley_y == 0)
-    # Fill in a linear ramp of length gulley_x in the first row to M.max()
-    D[0, :gulley_x] += np.linspace(0, side_fill_value, gulley_x)
-    # Same for first column
-    D[:gulley_y, 0] += np.linspace(0, side_fill_value, gulley_y)
-    # Now, ramp from M.max() to 0 for the bottom right corner
-    D[-1, -gulley_x:] += np.linspace(0, side_fill_value, gulley_x)[::-1]
-    D[-gulley_y:, -1] += np.linspace(0, side_fill_value, gulley_y)[::-1]
-    # After the ramp, just fill in the max til the end
-    D[0, gulley_x:] += side_fill_value    
-    D[gulley_y:, 0] += side_fill_value    
-    D[-1, :-gulley_x] += side_fill_value
-    D[:-gulley_y, -1] += side_fill_value  
-    # Finally, populate the middle of the matrix with the local costs
-    D += M
+    # Matrix of local costs, initialized to input matrix
+    D = np.copy(M)
     
     # Store the traceback
     phi = np.zeros(D.shape)
     # Handle first row/column, where we force back to the beginning
-    D[0, :] = np.cumsum(D[0, :])
-    D[:, 0] = np.cumsum(D[:, 0])
+    D[0, :] = np.cumsum(D[0, :]) + np.arange(D.shape[1])*pen
+    D[:, 0] = np.cumsum(D[:, 0]) + np.arange(D.shape[0])*pen
     phi[0, :] = 2
     phi[:, 0] = 1
     phi[0, 0] = 0   
-    # Handle final row/column, where we force starting at bottom right corner
-    #D[-1, ::-1] = np.cumsum(D[-1, ::-1])    
-    #D[::-1, -1] = np.cumsum(D[::-1, -1])
     
     for i in xrange(D.shape[0] - 1): 
         for j in xrange(D.shape[1] - 1):
             # The possible locations we can move to, weighted by penalty score
-            next_moves = [D[i, j], pen*D[i, j + 1], pen*D[i + 1, j]]
+            next_moves = [D[i, j], pen + D[i, j + 1], pen + D[i + 1, j]]
             # Choose the lowest cost
             tb = np.argmin(next_moves)
             dmin = next_moves[tb]
@@ -76,8 +52,7 @@ def dpmod(M, pen=1.0, G=0.0):
             # Store the traceback
             phi[i + 1, j + 1] = tb
     
-        
-    # Traceback from corner
+    # Traceback from lowest-cost point on bottom or right edge
     i = np.argmin(D[:, -1])
     j = np.argmin(D[-1, :])
     if D[i, -1] < D[-1, j]:
@@ -111,7 +86,7 @@ def dpmod(M, pen=1.0, G=0.0):
     # Normalize score
     score = score/q.shape[0]
     
-    return p, q, D, phi, score
+    return p, q, score
 
 # <codecell>
 
@@ -303,8 +278,8 @@ if __name__ == '__main__':
     import joblib
     import os
     SF2_PATH = '../Performer Synchronization Measure/SGM-V2.01.sf2'
-    OUTPUT_PATH = 'midi-aligned-new-new-dpmod-multiple-files'
-    BASE_PATH = 'data/cal10k'
+    OUTPUT_PATH = 'midi-aligned-additive-dpmod'
+    BASE_PATH = 'data/sanity'
     if not os.path.exists(os.path.join(BASE_PATH, OUTPUT_PATH)):
         os.makedirs(os.path.join(BASE_PATH, OUTPUT_PATH))
         
@@ -429,9 +404,9 @@ if __name__ == '__main__':
                                      fmax=librosa.midi_to_hz(96))
             
             # Get similarity matrix
-            similarity_matrix = scipy.spatial.distance.cdist(midi_gram.T, audio_gram.T, metric='seuclidean')
+            similarity_matrix = scipy.spatial.distance.cdist(midi_gram.T, audio_gram.T, metric='cosine')
             # Get best path through matrix
-            p, q, D, phi, score = dpmod(similarity_matrix**2, 1.01, 0.)
+            p, q, score = dpmod(similarity_matrix)
             # Store the score
             candidate_costs[n] = score
     
