@@ -151,16 +151,22 @@ if __name__=='__main__':
         ''' Shingle a matrix column-wise '''
         return np.vstack([x[:, n:(x.shape[1] - stacks + n)] for n in xrange(stacks)])
 
-    def load_data(directory):
+    def load_data(directory, shingle_size=4, train_validate_split=.8):
         ''' Load in all chroma matrices and piano rolls and output them as separate matrices '''
-        X = []
-        Y = []
+        X_train = []
+        Y_train = []
+        X_validate = []
+        Y_validate = []
         for chroma_filename in glob.glob(directory + '*-msd.npy'):
-            X += [shingle(np.load(chroma_filename), 4)]
             piano_roll_filename = chroma_filename.replace('msd', 'midi')
-            Y += [shingle(np.load(piano_roll_filename), 4)]
-        return np.hstack(X), np.hstack(Y)
-        
+            if np.random.rand() < train_validate_split:
+                X_train.append(shingle(np.load(chroma_filename), shingle_size))
+                Y_train.append(shingle(np.load(piano_roll_filename), shingle_size))
+            else:
+                X_validate.append(shingle(np.load(chroma_filename), shingle_size))
+                Y_validate.append(shingle(np.load(piano_roll_filename), shingle_size))
+        return np.hstack(X_train), np.hstack(Y_train), np.hstack(X_validate), np.hstack(Y_validate)
+
     def get_next_batch(X, Y, batch_size, n_iter):
         ''' Fast (hopefully) random mini batch generator '''
         n_batches = int(np.floor(X.shape[1]/batch_size))
@@ -179,9 +185,9 @@ if __name__=='__main__':
             current_batch += 1
 
     def standardize(X):
-        ''' Standardize the rows of a data matrix X '''
+        ''' Return column vectors to standardize X, via (X - X_mean)/X_std '''
         std = np.std(X, axis=1).reshape(-1, 1)
-        return (X - np.mean(X, axis=1).reshape(-1, 1))/(std + (std == 0))
+        return np.mean(X, axis=1).reshape(-1, 1), std + (std == 0)
       
     def hashes_used(X):
         ''' Get the number of unique hashes actually used '''
@@ -193,19 +199,15 @@ if __name__=='__main__':
         return np.all(points_equal, axis=0).sum(), np.logical_not(points_equal).sum(), hashes_used(X), hashes_used(Y)
     
     # Load in the data
-    X, Y = load_data('data/hash_dataset/')
+    X_train, Y_train, X_validate, Y_validate = load_data('data/hash_dataset/')
     
     # Standardize
-    X = standardize(X)
-    Y = standardize(Y)
-    
-    # Split into .8 train/test indices
-    train_indices = np.random.sample(X.shape[1]) < .8
-    X_train = np.array(X[:, train_indices])
-    Y_train = np.array(Y[:, train_indices])
-    validate_indices = np.logical_not(train_indices)
-    X_validate = np.array(X[:, validate_indices])
-    Y_validate = np.array(Y[:, validate_indices])
+    X_mean, X_std = standardize(X_train)
+    X_train = (X_train - X_mean)/X_std
+    X_validate = (X_validate - X_mean)/X_std
+    Y_mean, Y_std = standardize(Y_train)
+    Y_train = (Y_train - Y_mean)/Y_std
+    Y_validate = (Y_validate - Y_mean)/Y_std
     
     # Randomly select some data vectors to plot every so often
     plot_indices_train = np.random.randint(0, X_train.shape[1], 20)
@@ -219,7 +221,7 @@ if __name__=='__main__':
         # Every so many iterations, print the cost and plot some diagnostic figures
         if not n % 1000:
             display.clear_output()
-            print "Itertation {}".format(n)
+            print "Iteration {}".format(n)
             print "Cost: {}".format(current_cost)
             
             # Get accuracy and diagnostic figures for both train and validation sets
