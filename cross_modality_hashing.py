@@ -175,10 +175,10 @@ if __name__=='__main__':
             if current_batch >= n_batches:
                 positive_shuffle = np.random.permutation(X.shape[1])
                 negative_shuffle = np.random.permutation(X.shape[1])
-                X_p = X[:, positive_shuffle]
-                Y_p = Y[:, positive_shuffle]
-                X_n = X[:, negative_shuffle]
-                Y_n = Y[:, np.roll(negative_shuffle, 1)]
+                X_p = np.array(X[:, positive_shuffle])
+                Y_p = np.array(Y[:, positive_shuffle])
+                X_n = np.array(X[:, negative_shuffle])
+                Y_n = np.array(Y[:, np.roll(negative_shuffle, 1)])
                 current_batch = 0
             batch = np.r_[current_batch*batch_size:(current_batch + 1)*batch_size]
             yield X_p[:, batch], Y_p[:, batch], X_n[:, batch], Y_n[:, batch]
