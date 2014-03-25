@@ -190,14 +190,17 @@ if __name__=='__main__':
         std = np.std(X, axis=1).reshape(-1, 1)
         return np.mean(X, axis=1).reshape(-1, 1), std + (std == 0)
       
-    def hashes_used(X):
-        ''' Get the number of unique hashes actually used '''
-        return np.unique(np.sum(2**np.arange(X.shape[0]).reshape(-1, 1)*X, axis=0)).shape[0]
-
+    def hash_entropy(X):
+        ''' Get the entropy of the histogram of hashes (want this to be close to n_bits) '''
+        bit_values = np.sum(2**np.arange(X.shape[0]).reshape(-1, 1)*X, axis=0)
+        counts, _ = np.histogram(bit_values, np.arange(2**X.shape[0]))
+        counts = counts/float(counts.sum())
+        return -np.sum(counts*np.log2(counts + 1e-100))
+        
     def count_errors(X, Y):
         ''' Computes the number of correctly encoded codeworks and the number of bit errors made '''
         points_equal = (X == Y)
-        return np.all(points_equal, axis=0).sum(), np.logical_not(points_equal).sum(), hashes_used(X), hashes_used(Y)
+        return np.all(points_equal, axis=0).sum(), np.logical_not(points_equal).sum(), hash_entropy(X), hash_entropy(Y)
     
     # Load in the data
     X_train, Y_train, X_validate, Y_validate = load_data('data/hash_dataset/')
@@ -234,11 +237,11 @@ if __name__=='__main__':
                 X_output = X_eval(X_set)
                 Y_output = Y_eval(Y_set)
                 # Compute and display metrics on the resulting hashes
-                correct, errors, hashes_X, hashes_Y = count_errors(Y_output > 0, X_output > 0)
+                correct, errors, hash_entropy_X, hash_entropy_Y = count_errors(Y_output > 0, X_output > 0)
                 N = X_set.shape[1]
                 print "  {}/{} = {:.3f}% vectors hashed correctly".format(correct, N, correct/(1.*N)*100)
                 print "  {}/{} = {:.3f}% bits incorrect".format(errors, N*n_bits, errors/(1.*N*n_bits)*100)
-                print "  {}, {} of {} possible hashes used".format(hashes_X, hashes_Y, 2**n_bits)
+                print "  Entropy: {:.4f}, {:.4f}".format(hash_entropy_X, hash_entropy_Y, 2**n_bits)
                 
                 plt.figure(figsize=(18, 2))
                 # Show images of each networks output, binaraized and nonbinarized, and the error
