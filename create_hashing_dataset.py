@@ -50,10 +50,9 @@ def load_results(path_to_tsv):
 def get_data_folder(filename):
     ''' Given an mp3 filename, returns cal500 or cal10k depending on where the file is (a hack) '''
     if ' ' in filename:
-        path = 'cal10k'
+        return 'cal10k'
     else:
-        path = 'cal500'
-    return path
+        return 'cal500'
 
 # <codecell>
 
@@ -61,15 +60,26 @@ def get_data_folder(filename):
 if __name__=='__main__':
     # Set up paths
     base_data_path = 'data'
-    tsv_path = os.path.join(base_data_path, 'aligned', 'results.tsv')
+    aligned_path = os.path.join(base_data_path, 'aligned')
+    tsv_path = os.path.join(aligned_path, 'results.tsv')
     output_path = os.path.join(base_data_path, 'hash_dataset')
-
+    midi_directory = 'midi-aligned-new-new-dpmod-multiple-files'
+    
+    def to_numbered_mid(filename):
+        ''' Given an mp3 filename, return the corresponding best alignment .mid name according to the .pdf present '''
+        base, _ = os.path.splitext(filename)
+        if os.path.exists(os.path.join(aligned_path, base + '.pdf')):
+            return filename.replace('mp3', 'mid')
+        n = 1
+        while not os.path.exists(os.path.join(aligned_path, '{}.{}.pdf'.format(base, n))):
+            n += 1
+        return '{}.{}.mid'.format(base, n)
     def to_h5_path(filename):
         ''' Given an mp3 filename, returns the path to the corresponding -beats.npy file '''
         return os.path.join(base_data_path, get_data_folder(filename), 'msd', filename.replace('.mp3', '.h5'))
     def to_midi_path(filename):
         ''' Given an mp3 filename, returns the path to the corresponding midi file '''
-        return os.path.join(base_data_path, get_data_folder(filename), 'midi', filename.replace('.mp3', '.mid'))
+        return os.path.join(base_data_path, get_data_folder(filename), midi_directory, to_numbered_mid(filename))
 
     # Load in list of files which were aligned correctly, and the start/end times of the good alignment
     files, start_times, end_times = load_results(tsv_path)
