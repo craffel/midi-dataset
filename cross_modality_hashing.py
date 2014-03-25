@@ -129,7 +129,7 @@ cost = .5*T.sum((X_net.layers_p[-1].output - Y_net.layers_p[-1].output)**2) \
 
 # List of update steps for each parameter
 updates = []
-learning_rate = 1e-3
+learning_rate = 1e-4
 # Just gradient descent on cost
 for param in X_net.params + Y_net.params:
     updates.append((param, param - learning_rate*T.grad(cost, param)))
@@ -169,16 +169,17 @@ if __name__=='__main__':
 
     def get_next_batch(X, Y, batch_size, n_iter):
         ''' Fast (hopefully) random mini batch generator '''
-        n_batches = int(np.floor(X.shape[1]/batch_size))
+        N = X.shape[1]
+        n_batches = int(np.floor(N/float(batch_size)))
         current_batch = n_batches
         for n in xrange(n_iter):
             if current_batch >= n_batches:
-                positive_shuffle = np.random.permutation(X.shape[1])
-                negative_shuffle = np.random.permutation(X.shape[1])
+                positive_shuffle = np.random.permutation(N)
+                negative_shuffle = np.random.permutation(N)
                 X_p = np.array(X[:, positive_shuffle])
                 Y_p = np.array(Y[:, positive_shuffle])
-                X_n = np.array(X[:, negative_shuffle])
-                Y_n = np.array(Y[:, np.roll(negative_shuffle, 1)])
+                X_n = np.array(X[:, np.mod(negative_shuffle + 2*np.random.randint(0, 2, N) - 1, N)])
+                Y_n = np.array(Y[:, negative_shuffle])
                 current_batch = 0
             batch = np.r_[current_batch*batch_size:(current_batch + 1)*batch_size]
             yield X_p[:, batch], Y_p[:, batch], X_n[:, batch], Y_n[:, batch]
@@ -214,7 +215,7 @@ if __name__=='__main__':
     plot_indices_validate = np.random.randint(0, X_validate.shape[1], 20)
     
     # Value of m_{XY} to use
-    m_val = 4
+    m_val = 5
     
     for n, (X_p, Y_p, X_n, Y_n) in enumerate(get_next_batch(X_train, Y_train, 100, int(1e8))):
         current_cost = train(X_p, X_n, Y_p, Y_n, m_val)
