@@ -89,6 +89,9 @@ if __name__=='__main__':
         h5 = hdf5_getters.open_h5_file_read(to_h5_path(filename))
         # Load in beat times from MSD
         beats = hdf5_getters.get_beats_start(h5)
+        # Some files have no EN analysis
+        if beats.size == 0:
+            continue
         # Get indices which fall within the range of correct alignment
         time_mask = np.logical_and(beats > start_time, beats < end_time)
         beats = beats[time_mask]
