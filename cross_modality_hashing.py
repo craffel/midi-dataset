@@ -125,8 +125,8 @@ Y_net = MLP_two_inputs(Y_p_input, Y_n_input, [192, 256, 256, n_bits])
 m = T.scalar('m')
 # Compute cost function as described above
 cost = .5*T.sum((X_net.layers_p[-1].output - Y_net.layers_p[-1].output)**2) \
-#     + .5*T.sum(T.maximum(0, m - T.sum((X_net.layers_n[-1].output - Y_net.layers_n[-1].output)**2, axis=0)))
      + .5*T.sum(T.maximum(0, m - T.sqrt(T.sum((X_net.layers_n[-1].output - Y_net.layers_n[-1].output)**2, axis=0)))**2)
+#     + .5*T.sum(T.maximum(0, m - T.sum((X_net.layers_n[-1].output - Y_net.layers_n[-1].output)**2, axis=0)))
 
 # List of update steps for each parameter
 updates = []
