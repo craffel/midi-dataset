@@ -125,6 +125,7 @@ Y_net = MLP_two_inputs(Y_p_input, Y_n_input, [192, 256, 256, n_bits])
 m = T.scalar('m')
 # Compute cost function as described above
 cost = .5*T.sum((X_net.layers_p[-1].output - Y_net.layers_p[-1].output)**2) \
+#     + .5*T.sum(T.maximum(0, m - T.sum((X_net.layers_n[-1].output - Y_net.layers_n[-1].output)**2, axis=0)))
      + .5*T.sum(T.maximum(0, m - T.sqrt(T.sum((X_net.layers_n[-1].output - Y_net.layers_n[-1].output)**2, axis=0)))**2)
 
 # List of update steps for each parameter
@@ -142,10 +143,16 @@ Y_eval = theano.function([Y_p_input], Y_net.layers_p[-1].output)
 
 # <codecell>
 
+PLOT=False
+FLOATX=np.float32
+
+# <codecell>
+
 if __name__=='__main__':
     import glob
-    import matplotlib.pyplot as plt
-    from IPython import display
+    if PLOT:
+        import matplotlib.pyplot as plt
+        from IPython import display
     
     def shingle(x, stacks):
         ''' Shingle a matrix column-wise '''
@@ -165,7 +172,10 @@ if __name__=='__main__':
             else:
                 X_validate.append(shingle(np.load(chroma_filename), shingle_size))
                 Y_validate.append(shingle(np.load(piano_roll_filename), shingle_size))
-        return np.hstack(X_train), np.hstack(Y_train), np.hstack(X_validate), np.hstack(Y_validate)
+        return np.array(np.hstack(X_train), dtype=FLOATX), \
+               np.array(np.hstack(Y_train), dtype=FLOATX), \
+               np.array(np.hstack(X_validate), dtype=FLOATX), \
+               np.array(np.hstack(Y_validate), dtype=FLOATX)
 
     def get_next_batch(X, Y, batch_size, n_iter):
         ''' Fast (hopefully) random mini batch generator '''
@@ -179,6 +189,7 @@ if __name__=='__main__':
                 X_p = np.array(X[:, positive_shuffle])
                 Y_p = np.array(Y[:, positive_shuffle])
                 X_n = np.array(X[:, np.mod(negative_shuffle + 2*np.random.randint(0, 2, N) - 1, N)])
+                #X_n = np.array(X[:, np.random.permutation(N)])
                 Y_n = np.array(Y[:, negative_shuffle])
                 current_batch = 0
             batch = np.r_[current_batch*batch_size:(current_batch + 1)*batch_size]
@@ -224,7 +235,8 @@ if __name__=='__main__':
         current_cost = train(X_p, X_n, Y_p, Y_n, m_val)
         # Every so many iterations, print the cost and plot some diagnostic figures
         if not n % 1000:
-            display.clear_output()
+            if PLOT:
+                display.clear_output()
             print "Iteration {}".format(n)
             print "Cost: {}".format(current_cost)
             
@@ -243,14 +255,16 @@ if __name__=='__main__':
                 print "  {}/{} = {:.3f}% bits incorrect".format(errors, N*n_bits, errors/(1.*N*n_bits)*100)
                 print "  Entropy: {:.4f}, {:.4f}".format(hash_entropy_X, hash_entropy_Y, 2**n_bits)
                 
-                plt.figure(figsize=(18, 2))
-                # Show images of each networks output, binaraized and nonbinarized, and the error
-                for n, image in enumerate([Y_output[:, plot_indices],
-                                           X_output[:, plot_indices],
-                                           Y_output[:, plot_indices] > 0,
-                                           X_output[:, plot_indices] > 0,
-                                           np.not_equal(X_output[:, plot_indices] > 0, Y_output[:, plot_indices] > 0)]):
-                    plt.subplot(1, 5, n + 1)
-                    plt.imshow(image, aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
-            plt.show()
+                if PLOT:
+                    plt.figure(figsize=(18, 2))
+                    # Show images of each networks output, binaraized and nonbinarized, and the error
+                    for n, image in enumerate([Y_output[:, plot_indices],
+                                               X_output[:, plot_indices],
+                                               Y_output[:, plot_indices] > 0,
+                                               X_output[:, plot_indices] > 0,
+                                               np.not_equal(X_output[:, plot_indices] > 0, Y_output[:, plot_indices] > 0)]):
+                        plt.subplot(1, 5, n + 1)
+                        plt.imshow(image, aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
+            if PLOT:
+                plt.show()
 
