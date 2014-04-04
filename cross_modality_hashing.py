@@ -17,7 +17,7 @@ class Layer(object):
     def __init__(self, x, n_input, n_output, W=None, b=None, activation=T.tanh):
         '''
         A layer of a neural network, computes s(Wx + b) where s is a nonlinearity and x is the input vector.
-        
+
         Input:
             x - Theano symbolic variable for layer input
             n_input - number of input nodes
@@ -29,9 +29,9 @@ class Layer(object):
         # Randomly initialize W
         if W is None:
             # Tanh is best initialized to values between +/- sqrt(6/(n_nodes))
-            W_values = np.asarray(np.random.uniform( -np.sqrt(6./(n_input + n_output)), 
+            W_values = np.asarray(np.random.uniform( -np.sqrt(6./(n_input + n_output)),
                                                      np.sqrt(6./(n_input + n_output)),
-                                                     (n_output, n_input)), 
+                                                     (n_output, n_input)),
                                                      dtype=theano.config.floatX)
             # Sigmoid activation uses +/- 4*sqrt(6/(n_nodes))
             if activation == theano.tensor.nnet.sigmoid:
@@ -42,10 +42,10 @@ class Layer(object):
         if b is None:
             b = theano.shared(value=np.ones((n_output, 1), dtype=theano.config.floatX),
                               name='b', borrow=True, broadcastable=(False, True))
-        
+
         self.W = W
         self.b = b
-        
+
         # Compute linear mix
         lin_output = T.dot(self.W, x) + self.b
         # Output is just linear mix if no activation function
@@ -59,9 +59,9 @@ class MLP_two_inputs(object):
     def __init__(self, x_p, x_n, layer_sizes, activations=None):
         '''
         MLP class from which it is convenient to get the output for two data matrices at the same time
-        
+
         Input:
-            x_p - data matrix 1            
+            x_p - data matrix 1
             x_n - data matrix 2
             layer_sizes - List of length N of layer sizes, includes input and output dimensionality.
                 Resulting MLP will have N-1 layers.
@@ -84,7 +84,7 @@ class MLP_two_inputs(object):
             # Otherwise, input is previous layer's output
             else:
                 # Layer's input is previous layer's output
-                self.layers_p += [Layer(self.layers_p[n-1].output, n_input, n_output, activation=activation)]                
+                self.layers_p += [Layer(self.layers_p[n-1].output, n_input, n_output, activation=activation)]
                 # As above
                 self.layers_n += [Layer(self.layers_n[n-1].output,
                                         n_input, n_output,
@@ -143,17 +143,11 @@ Y_eval = theano.function([Y_p_input], Y_net.layers_p[-1].output)
 
 # <codecell>
 
-PLOT=False
-FLOATX=np.float32
-
-# <codecell>
-
 if __name__=='__main__':
     import glob
-    if PLOT:
-        import matplotlib.pyplot as plt
-        from IPython import display
-    
+    import matplotlib.pyplot as plt
+    from IPython import display
+
     def shingle(x, stacks):
         ''' Shingle a matrix column-wise '''
         return np.vstack([x[:, n:(x.shape[1] - stacks + n)] for n in xrange(stacks)])
@@ -200,22 +194,22 @@ if __name__=='__main__':
         ''' Return column vectors to standardize X, via (X - X_mean)/X_std '''
         std = np.std(X, axis=1).reshape(-1, 1)
         return np.mean(X, axis=1).reshape(-1, 1), std + (std == 0)
-      
+
     def hash_entropy(X):
         ''' Get the entropy of the histogram of hashes (want this to be close to n_bits) '''
         bit_values = np.sum(2**np.arange(X.shape[0]).reshape(-1, 1)*X, axis=0)
         counts, _ = np.histogram(bit_values, np.arange(2**X.shape[0]))
         counts = counts/float(counts.sum())
         return -np.sum(counts*np.log2(counts + 1e-100))
-        
+
     def count_errors(X, Y):
         ''' Computes the number of correctly encoded codeworks and the number of bit errors made '''
         points_equal = (X == Y)
         return np.all(points_equal, axis=0).sum(), np.logical_not(points_equal).sum(), hash_entropy(X), hash_entropy(Y)
-    
+
     # Load in the data
     X_train, Y_train, X_validate, Y_validate = load_data('data/hash_dataset/')
-    
+
     # Standardize
     X_mean, X_std = standardize(X_train)
     X_train = (X_train - X_mean)/X_std
@@ -223,27 +217,26 @@ if __name__=='__main__':
     Y_mean, Y_std = standardize(Y_train)
     Y_train = (Y_train - Y_mean)/Y_std
     Y_validate = (Y_validate - Y_mean)/Y_std
-    
+
     # Randomly select some data vectors to plot every so often
     plot_indices_train = np.random.randint(0, X_train.shape[1], 20)
     plot_indices_validate = np.random.randint(0, X_validate.shape[1], 20)
-    
+
     # Value of m_{XY} to use
     m_val = 5
-    
+
     for n, (X_p, Y_p, X_n, Y_n) in enumerate(get_next_batch(X_train, Y_train, 100, int(1e8))):
         current_cost = train(X_p, X_n, Y_p, Y_n, m_val)
         # Every so many iterations, print the cost and plot some diagnostic figures
         if not n % 1000:
-            if PLOT:
-                display.clear_output()
+            display.clear_output()
             print "Iteration {}".format(n)
             print "Cost: {}".format(current_cost)
-            
+
             # Get accuracy and diagnostic figures for both train and validation sets
             for name, X_set, Y_set, plot_indices in [('Train', X_train, Y_train, plot_indices_train),
                                                      ('Validate', X_validate, Y_validate, plot_indices_validate)]:
-                print 
+                print
                 print name
                 # Get the network output for this dataset
                 X_output = X_eval(X_set)
@@ -254,17 +247,15 @@ if __name__=='__main__':
                 print "  {}/{} = {:.3f}% vectors hashed correctly".format(correct, N, correct/(1.*N)*100)
                 print "  {}/{} = {:.3f}% bits incorrect".format(errors, N*n_bits, errors/(1.*N*n_bits)*100)
                 print "  Entropy: {:.4f}, {:.4f}".format(hash_entropy_X, hash_entropy_Y, 2**n_bits)
-                
-                if PLOT:
-                    plt.figure(figsize=(18, 2))
-                    # Show images of each networks output, binaraized and nonbinarized, and the error
-                    for n, image in enumerate([Y_output[:, plot_indices],
-                                               X_output[:, plot_indices],
-                                               Y_output[:, plot_indices] > 0,
-                                               X_output[:, plot_indices] > 0,
-                                               np.not_equal(X_output[:, plot_indices] > 0, Y_output[:, plot_indices] > 0)]):
-                        plt.subplot(1, 5, n + 1)
-                        plt.imshow(image, aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
-            if PLOT:
-                plt.show()
+                print
 
+                plt.figure(figsize=(18, 2))
+                # Show images of each networks output, binaraized and nonbinarized, and the error
+                for n, image in enumerate([Y_output[:, plot_indices],
+                                           X_output[:, plot_indices],
+                                           Y_output[:, plot_indices] > 0,
+                                           X_output[:, plot_indices] > 0,
+                                           np.not_equal(X_output[:, plot_indices] > 0, Y_output[:, plot_indices] > 0)]):
+                    plt.subplot(1, 5, n + 1)
+                    plt.imshow(image, aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
+            plt.show()
