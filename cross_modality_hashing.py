@@ -166,10 +166,10 @@ if __name__=='__main__':
             else:
                 X_validate.append(shingle(np.load(chroma_filename), shingle_size))
                 Y_validate.append(shingle(np.load(piano_roll_filename), shingle_size))
-        return np.array(np.hstack(X_train), dtype=FLOATX), \
-               np.array(np.hstack(Y_train), dtype=FLOATX), \
-               np.array(np.hstack(X_validate), dtype=FLOATX), \
-               np.array(np.hstack(Y_validate), dtype=FLOATX)
+        return np.array(np.hstack(X_train), dtype=theano.config.floatX, order='F'), \
+               np.array(np.hstack(Y_train), dtype=theano.config.floatX, order='F'), \
+               np.array(np.hstack(X_validate), dtype=theano.config.floatX, order='F'), \
+               np.array(np.hstack(Y_validate), dtype=theano.config.floatX, order='F')
 
     def get_next_batch(X, Y, batch_size, n_iter):
         ''' Fast (hopefully) random mini batch generator '''
@@ -186,7 +186,7 @@ if __name__=='__main__':
                 #X_n = np.array(X[:, np.random.permutation(N)])
                 Y_n = np.array(Y[:, negative_shuffle])
                 current_batch = 0
-            batch = np.r_[current_batch*batch_size:(current_batch + 1)*batch_size]
+            batch = slice(current_batch*batch_size, (current_batch + 1)*batch_size)
             yield X_p[:, batch], Y_p[:, batch], X_n[:, batch], Y_n[:, batch]
             current_batch += 1
 
