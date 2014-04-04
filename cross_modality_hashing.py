@@ -211,7 +211,12 @@ if __name__=='__main__':
     def count_errors(X, Y):
         ''' Computes the number of correctly encoded codeworks and the number of bit errors made '''
         points_equal = (X == Y)
-        return np.all(points_equal, axis=0).sum(), np.logical_not(points_equal).sum(), hash_entropy(X), hash_entropy(Y)
+        wrong_points_equal = (X[:, np.random.permutation(X.shape[1])] == Y)
+        return np.all(points_equal, axis=0).sum(), \
+               np.mean(np.logical_not(points_equal).sum(axis=0)), \
+               np.all(wrong_points_equal, axis=0).sum(), \
+               np.mean(np.logical_not(wrong_points_equal).sum(axis=0)), \
+               hash_entropy(X), hash_entropy(Y)
 
     # Load in the data
     X_train, Y_train, X_validate, Y_validate = load_data('data/hash_dataset/')
@@ -253,10 +258,12 @@ if __name__=='__main__':
                 X_output = X_eval(X_set)
                 Y_output = Y_eval(Y_set)
                 # Compute and display metrics on the resulting hashes
-                correct, errors, hash_entropy_X, hash_entropy_Y = count_errors(Y_output > 0, X_output > 0)
+                correct, in_class, collisions, out_of_class, hash_entropy_X, hash_entropy_Y = count_errors(Y_output > 0, X_output > 0)
                 N = X_set.shape[1]
                 print "  {}/{} = {:.3f}% vectors hashed correctly".format(correct, N, correct/(1.*N)*100)
-                print "  {}/{} = {:.3f}% bits incorrect".format(errors, N*n_bits, errors/(1.*N*n_bits)*100)
+                print "  {:.3f} average in-class distance".format(in_class)
+                print "  {}/{} = {:.3f}% hash collisions".format(collisions, N, collisions/(1.*N)*100)
+                print "  {:.3f} average out-of-class distance".format(out_of_class)
                 print "  Entropy: {:.4f}, {:.4f}".format(hash_entropy_X, hash_entropy_Y, 2**n_bits)
                 print
 
