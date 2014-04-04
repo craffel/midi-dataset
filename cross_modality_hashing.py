@@ -99,7 +99,7 @@ class MLP_two_inputs(object):
 # <codecell>
 
 # Dimensionality of hamming space
-n_bits = 8
+n_bits = 16
 # First neural net, for chroma vectors
 X_p_input = T.matrix('X_p_input')
 X_n_input = T.matrix('X_n_input')
@@ -122,11 +122,17 @@ Y_net = MLP_two_inputs(Y_p_input, Y_n_input, [192, 256, 256, n_bits])
 # <codecell>
 
 # Threshold parameter
-m = T.scalar('m')
+alpha_XY = T.scalar('alpha_XY')
+m_XY = T.scalar('m_XY')
+alpha_X = T.scalar('alpha_X')
+m_X = T.scalar('m_X')
+alpha_Y = T.scalar('alpha_Y')
+m_Y = T.scalar('m_Y')
 # Compute cost function as described above
-cost = .5*T.sum((X_net.layers_p[-1].output - Y_net.layers_p[-1].output)**2) \
-     + .5*T.sum(T.maximum(0, m - T.sqrt(T.sum((X_net.layers_n[-1].output - Y_net.layers_n[-1].output)**2, axis=0)))**2)
-#     + .5*T.sum(T.maximum(0, m - T.sum((X_net.layers_n[-1].output - Y_net.layers_n[-1].output)**2, axis=0)))
+cost = T.sum((X_net.layers_p[-1].output - Y_net.layers_p[-1].output)**2) \
+     + alpha_XY*T.sum(T.maximum(0, 4*m_XY - T.sum((X_net.layers_n[-1].output - Y_net.layers_n[-1].output)**2, axis=0))) \
+     + alpha_X*T.sum(T.maximum(0, 4*m_X - T.sum((X_net.layers_p[-1].output - X_net.layers_n[-1].output)**2, axis=0))) \
+     + alpha_Y*T.sum(T.maximum(0, 4*m_Y - T.sum((Y_net.layers_p[-1].output - Y_net.layers_n[-1].output)**2, axis=0)))
 
 # List of update steps for each parameter
 updates = []
@@ -136,7 +142,7 @@ for param in X_net.params + Y_net.params:
     updates.append((param, param - learning_rate*T.grad(cost, param)))
 
 # Function for optimizing the neural net parameters, by minimizing cost
-train = theano.function([X_p_input, X_n_input, Y_p_input, Y_n_input, m], cost, updates=updates)
+train = theano.function([X_p_input, X_n_input, Y_p_input, Y_n_input, alpha_XY, m_XY, alpha_X, m_X, alpha_Y, m_Y], cost, updates=updates)
 # Functions for actually computing the output of each neural net
 X_eval = theano.function([X_p_input], X_net.layers_p[-1].output)
 Y_eval = theano.function([Y_p_input], Y_net.layers_p[-1].output)
@@ -223,12 +229,17 @@ if __name__=='__main__':
     plot_indices_validate = np.random.randint(0, X_validate.shape[1], 20)
 
     # Value of m_{XY} to use
-    m_val = 5
+    alpha_XY_val = 1
+    m_XY_val = 8
+    alpha_X_val = 1
+    m_X_val = 8
+    alpha_Y_val = 1
+    m_Y_val = 8
 
-    for n, (X_p, Y_p, X_n, Y_n) in enumerate(get_next_batch(X_train, Y_train, 100, int(1e8))):
-        current_cost = train(X_p, X_n, Y_p, Y_n, m_val)
+    for n, (X_p, Y_p, X_n, Y_n) in enumerate(get_next_batch(X_train, Y_train, 10, int(1e8))):
+        current_cost = train(X_p, X_n, Y_p, Y_n, m_XY_val, alpha_X_val, m_X_val, alpha_Y_val, m_Y_val)
         # Every so many iterations, print the cost and plot some diagnostic figures
-        if not n % 1000:
+        if not n % 5000:
             display.clear_output()
             print "Iteration {}".format(n)
             print "Cost: {}".format(current_cost)
