@@ -188,8 +188,8 @@ if __name__=='__main__':
                 negative_shuffle = np.random.permutation(N)
                 X_p = np.array(X[:, positive_shuffle])
                 Y_p = np.array(Y[:, positive_shuffle])
-                X_n = np.array(X[:, np.mod(negative_shuffle + 2*np.random.randint(0, 2, N) - 1, N)])
-                #X_n = np.array(X[:, np.random.permutation(N)])
+                #X_n = np.array(X[:, np.mod(negative_shuffle + 2*np.random.randint(0, 2, N) - 1, N)])
+                X_n = np.array(X[:, np.random.permutation(N)])
                 Y_n = np.array(Y[:, negative_shuffle])
                 current_batch = 0
             batch = slice(current_batch*batch_size, (current_batch + 1)*batch_size)
@@ -237,7 +237,7 @@ if __name__=='__main__':
     m_Y_val = 8
 
     for n, (X_p, Y_p, X_n, Y_n) in enumerate(get_next_batch(X_train, Y_train, 10, int(1e8))):
-        current_cost = train(X_p, X_n, Y_p, Y_n, m_XY_val, alpha_X_val, m_X_val, alpha_Y_val, m_Y_val)
+        current_cost = train(X_p, X_n, Y_p, Y_n, alpha_XY_val, m_XY_val, alpha_X_val, m_X_val, alpha_Y_val, m_Y_val)
         # Every so many iterations, print the cost and plot some diagnostic figures
         if not n % 5000:
             display.clear_output()
@@ -270,3 +270,4 @@ if __name__=='__main__':
                     plt.subplot(1, 5, n + 1)
                     plt.imshow(image, aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
             plt.show()
+
