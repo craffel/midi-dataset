@@ -158,7 +158,7 @@ if __name__=='__main__':
         ''' Shingle a matrix column-wise '''
         return np.vstack([x[:, n:(x.shape[1] - stacks + n)] for n in xrange(stacks)])
 
-    def load_data(directory, shingle_size=4, train_validate_split=.8):
+    def load_data(directory, shingle_size=4, train_validate_split=.9):
         ''' Load in all chroma matrices and piano rolls and output them as separate matrices '''
         X_train = []
         Y_train = []
