@@ -14,12 +14,11 @@ import theano
 # <codecell>
 
 class Layer(object):
-    def __init__(self, x, n_input, n_output, W=None, b=None, activation=T.tanh):
+    def __init__(self, n_input, n_output, W=None, b=None, activation=T.tanh):
         '''
         A layer of a neural network, computes s(Wx + b) where s is a nonlinearity and x is the input vector.
 
         Input:
-            x - Theano symbolic variable for layer input
             n_input - number of input nodes
             n_output - number of output nodes
             W - Mixing matrix, default None which means initialize randomly
@@ -45,70 +44,167 @@ class Layer(object):
 
         self.W = W
         self.b = b
+        self.activation = activation
 
+        # Easy-to-access parameter list
+        self.params = [self.W, self.b]
+        
+    def output(self, x):
+        '''
+        Compute this layer's output given an input
+        
+        Input:
+            x - Theano symbolic variable for layer input
+        Output:
+            output - Mixed, biased, and activated x
+        '''
         # Compute linear mix
         lin_output = T.dot(self.W, x) + self.b
         # Output is just linear mix if no activation function
-        self.output = (lin_output if activation is None else activation(lin_output))
-        # Easy-to-access parameter list
-        self.params = [self.W, self.b]
+        return (lin_output if self.activation is None else self.activation(lin_output))
 
 # <codecell>
 
-class MLP_two_inputs(object):
-    def __init__(self, x_p, x_n, layer_sizes, activations=None):
+class MLP(object):
+    def __init__(self, layer_sizes=None, Ws=None, bs=None, activations=None):
         '''
-        MLP class from which it is convenient to get the output for two data matrices at the same time
+        Multi-layer perceptron
 
         Input:
-            x_p - data matrix 1
-            x_n - data matrix 2
-            layer_sizes - List of length N of layer sizes, includes input and output dimensionality.
-                Resulting MLP will have N-1 layers.
-            activations - List of length N-1 of activation function for each layer, default tanh
+            layer_sizes - List-like of layer sizes, len n_layers + 1, includes input and output dimensionality
+                Default None, which means retrieve layer sizes from W
+            Ws - List-like of weight matrices, len n_layers, where Ws[n] is layer_sizes[n + 1] x layer_sizes[n]
+                Default None, which means initialize randomly
+            bs - List-like of biases, len n_layers, where bs[n] is layer_sizes[n + 1]
+                Default None, which means initialize randomly
+            activations - List of length n_layers of activation function for each layer
+                Default None, which means all layers are tanh
         '''
+        # Check that we received layer sizes or weight matrices + bias vectors
+        if layer_sizes is None and Ws is None:
+            raise ValueError('Either layer_sizes or Ws must not be None')
+
         # Initialize lists of layers
-        self.layers_p = []
-        self.layers_n = []
+        self.layers = []
+
+        # Populate layer sizes if none was provided
+        if layer_sizes is None:
+            layer_sizes = []
+            # Each layer size is the input size of each mixing matrix
+            for W in Ws:
+                layer_sizes.append(W.shape[1])
+            # plus the output size of the last layer
+            layer_sizes.append(Ws[-1].shape[0])
+
+        # Make a list of Nones if Ws and bs are None
+        if Ws is None:
+            Ws = [None]*(len(layer_sizes) - 1)
+        if bs is None:
+            bs = [None]*(len(layer_sizes) - 1)
+
         # All activations are tanh if none was provided
         if activations is None:
             activations = [T.tanh]*(len(layer_sizes) - 1)
+            
         # Construct the layers
-        for n, (n_input, n_output, activation) in enumerate( zip( layer_sizes[:-1], layer_sizes[1:], activations ) ):
-            # For first layer, input is x
-            if n == 0:
-                # Need to create two MLPs...
-                self.layers_p += [Layer(x_p, n_input, n_output, activation=activation)]
-                # where weight matrices and bias vectors are shared
-                self.layers_n += [Layer(x_n, n_input, n_output, W=self.layers_p[0].W, b=self.layers_p[0].b, activation=activation)]
-            # Otherwise, input is previous layer's output
-            else:
-                # Layer's input is previous layer's output
-                self.layers_p += [Layer(self.layers_p[n-1].output, n_input, n_output, activation=activation)]
-                # As above
-                self.layers_n += [Layer(self.layers_n[n-1].output,
-                                        n_input, n_output,
-                                        W=self.layers_p[n].W,
-                                        b=self.layers_p[n].b,
-                                        activation=activation)]
+        for n, (n_input, n_output, W, b, activation) in enumerate(zip(layer_sizes[:-1], layer_sizes[1:], Ws, bs, activations)):
+            self.layers.append(Layer(n_input, n_output, W, b, activation=activation))
+
         # Combine parameters from all layers
         self.params = []
-        for layer in self.layers_p:
+        for layer in self.layers:
             self.params += layer.params
+        
+    def output(self, x):
+        '''
+        Compute the MLP's output given an input
+        
+        Input:
+            x - Theano symbolic variable for MLP input
+        Output:
+            output - x passed through the net
+        '''
+        # Recursively compute output
+        for layer in self.layers:
+            x = layer.output(x)
+        return x
 
 # <codecell>
 
-# Dimensionality of hamming space
-n_bits = 16
-# First neural net, for chroma vectors
-X_p_input = T.matrix('X_p_input')
-X_n_input = T.matrix('X_n_input')
-# Number and size of layers chosen somewhat arbitrarily
-X_net = MLP_two_inputs(X_p_input, X_n_input, [100, 128, 128, n_bits])
-# Second neural net, for MIDI piano roll
-Y_p_input = T.matrix('Y_p_input')
-Y_n_input = T.matrix('Y_n_input')
-Y_net = MLP_two_inputs(Y_p_input, Y_n_input, [192, 256, 256, n_bits])
+class SiameseNet(object):
+    def __init__(self, layer_sizes_x, layer_sizes_y, activations_x=None, activations_y=None):
+        '''
+        "Siamese" neural net, which takes inputs from two modalities and maps them to a common modality
+        
+        Input:
+            layer_sizes_x - List-like of layer sizes for "x" net, len n_layers + 1, includes input and output dimensionality
+            layer_sizes_y - List-like of layer sizes for "y" net, len n_layers + 1, includes input and output dimensionality
+            activations_x - List of length n_layers of activation function for each layer in "x" net
+                Default None, which means all layers are tanh
+            activations_x - List of length n_layers of activation function for each layer in "y" net
+                Default None, which means all layers are tanh
+        '''
+        # Create each network
+        self.X_net = MLP(layer_sizes_x, activations=activations_x)
+        self.Y_net = MLP(layer_sizes_y, activations=activations_y)
+        # Concatenate list of parameters
+        self.params = self.X_net.params + self.Y_net.params
+        
+    def cross_modality_cost(self, x_p, x_n, y_p, y_n, alpha_XY, m_XY, alpha_X, m_X, alpha_Y, m_y):
+        '''
+        Compute the cost of encoding a set of positive and negative inputs from both modalities
+        
+        Input:
+            x_p - Theano symbolic variable of positive examples from modality "x"
+            x_n - Theano symbolic variable of negative examples from modality "x"
+            y_p - Theano symbolic variable of positive examples from modality "y"
+            y_n - Theano symbolic variable of negative examples from modality "y"
+            alpha_XY - Theano symbolic variable for scaling parameter for cross-modality negative example cost
+            m_XY - Theano symbolic variable for cross-modality negative example threshold
+            alpha_X - Theano symbolic variable for scaling parameter for X-modality negative example cost
+            m_X - Theano symbolic variable for Y-modality negative example threshold
+            alpha_Y - Theano symbolic variable for scaling parameter for Y-modality negative example cost
+            m_Y - Theano symbolic variable for Y-modality negative example threshold
+        Output:
+            cost - cost, given these parameters and data
+        '''
+        # Unthresholded, unscaled cost of positive examples across modalities
+        cost_p = T.sum((self.X_net.output(x_p) - self.Y_net.output(y_p))**2)
+        # Thresholded, scaled cost of cross-modality negative examples
+        cost_n = alpha_XY*T.sum(T.maximum(0, 4*m_XY - T.sum((self.X_net.output(x_n) - self.Y_net.output(y_n))**2, axis=0)))
+        # Thresholded, scaled cost of x-modality negative examples
+        cost_x = alpha_X*T.sum(T.maximum(0, 4*m_X - T.sum((self.X_net.output(x_p) - self.X_net.output(x_n))**2, axis=0)))
+        # Thresholded, scaled cost of y-modality negative examples
+        cost_y = alpha_Y*T.sum(T.maximum(0, 4*m_Y - T.sum((self.Y_net.output(y_p) - self.Y_net.output(y_n))**2, axis=0)))
+        # Return sum of these costs
+        return cost_p + cost_n + cost_x + cost_y
+
+# <codecell>
+
+def gradient_updates(cost, params, learning_rate):
+    '''
+    Compute updates for gradient descent over some parameters.
+    
+    Input:
+        cost - Theano cost function to minimize
+        params - Parameters to compute gradient against
+        learning_rate - GD learning rate
+    Output:
+        updates - list of updates, per-parameter
+    '''
+    # List of update steps for each parameter
+    updates = []
+    # Just gradient descent on cost
+    for param in params:
+        updates.append((param, param - learning_rate*T.grad(cost, param)))
+    return updates
+
+# <codecell>
+
+def gradient_updates_momentum():
+    '''
+    '''
+    return None
 
 # <markdowncell>
 
@@ -118,34 +214,6 @@ Y_net = MLP_two_inputs(Y_p_input, Y_n_input, [192, 256, 256, n_bits])
 # + \frac{1}{2} \sum_{(x, y) \in \mathcal{N}_{XY}} \max \{0, m_{XY} - \|\xi(x) - \eta(y)\|_2\}^2
 # $$
 # where $(x, y) \in \mathcal{P}_{XY}$ denotes that $x$ and $y$ are in the same class and $(x, y) \in \mathcal{N}_{XY}$ denotes that $x$ and $y$ are in different classes, $\xi$ is the function of one neural network and $\eta$ is the function of the other and $m_{XY}$ is the hinge loss threshold.
-
-# <codecell>
-
-# Threshold parameter
-alpha_XY = T.scalar('alpha_XY')
-m_XY = T.scalar('m_XY')
-alpha_X = T.scalar('alpha_X')
-m_X = T.scalar('m_X')
-alpha_Y = T.scalar('alpha_Y')
-m_Y = T.scalar('m_Y')
-# Compute cost function as described above
-cost = T.sum((X_net.layers_p[-1].output - Y_net.layers_p[-1].output)**2) \
-     + alpha_XY*T.sum(T.maximum(0, 4*m_XY - T.sum((X_net.layers_n[-1].output - Y_net.layers_n[-1].output)**2, axis=0))) \
-     + alpha_X*T.sum(T.maximum(0, 4*m_X - T.sum((X_net.layers_p[-1].output - X_net.layers_n[-1].output)**2, axis=0))) \
-     + alpha_Y*T.sum(T.maximum(0, 4*m_Y - T.sum((Y_net.layers_p[-1].output - Y_net.layers_n[-1].output)**2, axis=0)))
-
-# List of update steps for each parameter
-updates = []
-learning_rate = 1e-4
-# Just gradient descent on cost
-for param in X_net.params + Y_net.params:
-    updates.append((param, param - learning_rate*T.grad(cost, param)))
-
-# Function for optimizing the neural net parameters, by minimizing cost
-train = theano.function([X_p_input, X_n_input, Y_p_input, Y_n_input, alpha_XY, m_XY, alpha_X, m_X, alpha_Y, m_Y], cost, updates=updates)
-# Functions for actually computing the output of each neural net
-X_eval = theano.function([X_p_input], X_net.layers_p[-1].output)
-Y_eval = theano.function([Y_p_input], Y_net.layers_p[-1].output)
 
 # <codecell>
 
@@ -188,8 +256,8 @@ if __name__=='__main__':
                 negative_shuffle = np.random.permutation(N)
                 X_p = np.array(X[:, positive_shuffle])
                 Y_p = np.array(Y[:, positive_shuffle])
-                X_n = np.array(X[:, np.mod(negative_shuffle + 2*np.random.randint(0, 2, N) - 1, N)])
-                #X_n = np.array(X[:, np.random.permutation(N)])
+                #X_n = np.array(X[:, np.mod(negative_shuffle + 2*np.random.randint(0, 2, N) - 1, N)])
+                X_n = np.array(X[:, np.random.permutation(N)])
                 Y_n = np.array(Y[:, negative_shuffle])
                 current_batch = 0
             batch = slice(current_batch*batch_size, (current_batch + 1)*batch_size)
@@ -223,10 +291,45 @@ if __name__=='__main__':
     Y_mean, Y_std = standardize(Y_train)
     Y_train = (Y_train - Y_mean)/Y_std
     Y_validate = (Y_validate - Y_mean)/Y_std
+    
+    # Dimensionality of hamming space
+    n_bits = 16
+    # Number of layers in each network
+    n_layers = 3
+    
+    # Compute layer sizes.  Middle layers are nextpow2(input size)
+    layer_sizes_x = [X_train.shape[0]] + [int(2**np.ceil(np.log2(X_train.shape[0])))]*(n_layers - 1) + [n_bits]
+    layer_sizes_y = [Y_train.shape[0]] + [int(2**np.ceil(np.log2(Y_train.shape[0])))]*(n_layers - 1) + [n_bits]
+    hasher = SiameseNet(layer_sizes_x, layer_sizes_y)
+
+    # First neural net, for chroma vectors
+    X_p_input = T.matrix('X_p_input')
+    X_n_input = T.matrix('X_n_input')
+    # Second neural net, for MIDI piano roll
+    Y_p_input = T.matrix('Y_p_input')
+    Y_n_input = T.matrix('Y_n_input')
+    # Hyperparameters
+    alpha_XY = T.scalar('alpha_XY')
+    m_XY = T.scalar('m_XY')
+    alpha_X = T.scalar('alpha_X')
+    m_X = T.scalar('m_X')
+    alpha_Y = T.scalar('alpha_Y')
+    m_Y = T.scalar('m_Y')
+    learning_rate = 1e-4
+    # Create theano symbolic function for cost
+    hasher_cost = hasher.cross_modality_cost(X_p_input, X_n_input, Y_p_input, Y_n_input,
+                                             alpha_XY, m_XY, alpha_X, m_X, alpha_Y, m_Y)
+    # Function for optimizing the neural net parameters, by minimizing cost
+    train = theano.function([X_p_input, X_n_input, Y_p_input, Y_n_input,
+                             alpha_XY, m_XY, alpha_X, m_X, alpha_Y, m_Y],
+                            hasher_cost,
+                            updates=gradient_updates(hasher_cost,
+                                                     hasher.params,
+                                                     learning_rate))
 
     # Randomly select some data vectors to plot every so often
-    plot_indices_train = np.random.randint(0, X_train.shape[1], 20)
-    plot_indices_validate = np.random.randint(0, X_validate.shape[1], 20)
+    plot_indices_train = np.random.choice(X_train.shape[1], 20, False)
+    plot_indices_validate = np.random.choice(X_validate.shape[1], 20, False)
 
     # Value of m_{XY} to use
     alpha_XY_val = 1
@@ -235,38 +338,49 @@ if __name__=='__main__':
     m_X_val = 8
     alpha_Y_val = 1
     m_Y_val = 8
+    
+    # Maximum number of iterations to run
+    n_iter = int(1e8)
+    # Store the cost at each iteration
+    costs = np.zeros(n_iter)
 
-    for n, (X_p, Y_p, X_n, Y_n) in enumerate(get_next_batch(X_train, Y_train, 10, int(1e8))):
-        current_cost = train(X_p, X_n, Y_p, Y_n, m_XY_val, alpha_X_val, m_X_val, alpha_Y_val, m_Y_val)
-        # Every so many iterations, print the cost and plot some diagnostic figures
-        if not n % 5000:
-            display.clear_output()
-            print "Iteration {}".format(n)
-            print "Cost: {}".format(current_cost)
+    try:
+        for n, (X_p, Y_p, X_n, Y_n) in enumerate(get_next_batch(X_train, Y_train, 10, n_iter)):
+            costs[n] = train(X_p, X_n, Y_p, Y_n, alpha_XY_val, m_XY_val, alpha_X_val, m_X_val, alpha_Y_val, m_Y_val)
+            # Every so many iterations, print the cost and plot some diagnostic figures
+            if not n % 5000:
+                display.clear_output()
+                print "Iteration {}".format(n)
+                print "Cost: {}".format(costs[n])
+    
+                # Get accuracy and diagnostic figures for both train and validation sets
+                for name, X_set, Y_set, plot_indices in [('Train', X_train, Y_train, plot_indices_train),
+                                                         ('Validate', X_validate, Y_validate, plot_indices_validate)]:
+                    print
+                    print name
+                    # Get the network output for this dataset
+                    X_output = hasher.X_net.output(X_set).eval()
+                    Y_output = hasher.Y_net.output(Y_set).eval()
+                    # Compute and display metrics on the resulting hashes
+                    correct, errors, hash_entropy_X, hash_entropy_Y = count_errors(Y_output > 0, X_output > 0)
+                    N = X_set.shape[1]
+                    print "  {}/{} = {:.3f}% vectors hashed correctly".format(correct, N, correct/(1.*N)*100)
+                    print "  {}/{} = {:.3f}% bits incorrect".format(errors, N*n_bits, errors/(1.*N*n_bits)*100)
+                    print "  Entropy: {:.4f}, {:.4f}".format(hash_entropy_X, hash_entropy_Y, 2**n_bits)
+                    print
+    
+                    plt.figure(figsize=(18, 2))
+                    # Show images of each networks output, binaraized and nonbinarized, and the error
+                    for n, image in enumerate([Y_output[:, plot_indices],
+                                               X_output[:, plot_indices],
+                                               Y_output[:, plot_indices] > 0,
+                                               X_output[:, plot_indices] > 0,
+                                               np.not_equal(X_output[:, plot_indices] > 0, Y_output[:, plot_indices] > 0)]):
+                        plt.subplot(1, 5, n + 1)
+                        plt.imshow(image, aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
+                plt.show()
+    except KeyboardInterrupt:
+        costs = costs[:n]
+        plt.figure(figsize=(12, 12))
+        plt.plot(costs)
 
-            # Get accuracy and diagnostic figures for both train and validation sets
-            for name, X_set, Y_set, plot_indices in [('Train', X_train, Y_train, plot_indices_train),
-                                                     ('Validate', X_validate, Y_validate, plot_indices_validate)]:
-                print
-                print name
-                # Get the network output for this dataset
-                X_output = X_eval(X_set)
-                Y_output = Y_eval(Y_set)
-                # Compute and display metrics on the resulting hashes
-                correct, errors, hash_entropy_X, hash_entropy_Y = count_errors(Y_output > 0, X_output > 0)
-                N = X_set.shape[1]
-                print "  {}/{} = {:.3f}% vectors hashed correctly".format(correct, N, correct/(1.*N)*100)
-                print "  {}/{} = {:.3f}% bits incorrect".format(errors, N*n_bits, errors/(1.*N*n_bits)*100)
-                print "  Entropy: {:.4f}, {:.4f}".format(hash_entropy_X, hash_entropy_Y, 2**n_bits)
-                print
-
-                plt.figure(figsize=(18, 2))
-                # Show images of each networks output, binaraized and nonbinarized, and the error
-                for n, image in enumerate([Y_output[:, plot_indices],
-                                           X_output[:, plot_indices],
-                                           Y_output[:, plot_indices] > 0,
-                                           X_output[:, plot_indices] > 0,
-                                           np.not_equal(X_output[:, plot_indices] > 0, Y_output[:, plot_indices] > 0)]):
-                    plt.subplot(1, 5, n + 1)
-                    plt.imshow(image, aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
-            plt.show()
