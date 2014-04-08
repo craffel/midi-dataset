@@ -201,10 +201,26 @@ def gradient_updates(cost, params, learning_rate):
 
 # <codecell>
 
-def gradient_updates_momentum():
+def gradient_updates_momentum(cost, params, learning_rate, momentum):
     '''
+    Compute updates for gradient descent with momentum
+    
+    Input:
+        cost - Theano cost function to minimize
+        params - Parameters to compute gradient against
+        learning_rate - GD learning rate
+        momentum - GD momentum
+    Output:
+        updates - list of updates, per-parameter
     '''
-    return None
+    # List of update steps for each parameter
+    updates = []
+    # Just gradient descent on cost
+    for param in params:
+        mparam = theano.shared(param.get_value()*0., broadcastable=param.broadcastable)
+        updates.append((param, param - learning_rate*mparam))
+        updates.append((mparam, mparam*momentum + (1. - momentum)*T.grad(cost, param)))
+    return updates
 
 # <markdowncell>
 
@@ -276,15 +292,12 @@ if __name__=='__main__':
         counts = counts/float(counts.sum())
         return -np.sum(counts*np.log2(counts + 1e-100))
 
-    def count_errors(X, Y):
+    def statistics(X, Y):
         ''' Computes the number of correctly encoded codeworks and the number of bit errors made '''
         points_equal = (X == Y)
-        wrong_points_equal = (X[:, np.random.permutation(X.shape[1])] == Y)
         return np.all(points_equal, axis=0).sum(), \
                np.mean(np.logical_not(points_equal).sum(axis=0)), \
-               np.all(wrong_points_equal, axis=0).sum(), \
-               np.mean(np.logical_not(wrong_points_equal).sum(axis=0)), \
-               hash_entropy(X), hash_entropy(Y)
+               np.std(np.logical_not(points_equal).sum(axis=0))
 
     # Load in the data
     X_train, Y_train, X_validate, Y_validate = load_data('data/hash_dataset/')
@@ -321,6 +334,7 @@ if __name__=='__main__':
     alpha_Y = T.scalar('alpha_Y')
     m_Y = T.scalar('m_Y')
     learning_rate = 1e-4
+    momentum = .9
     # Create theano symbolic function for cost
     hasher_cost = hasher.cross_modality_cost(X_p_input, X_n_input, Y_p_input, Y_n_input,
                                              alpha_XY, m_XY, alpha_X, m_X, alpha_Y, m_Y)
@@ -328,9 +342,10 @@ if __name__=='__main__':
     train = theano.function([X_p_input, X_n_input, Y_p_input, Y_n_input,
                              alpha_XY, m_XY, alpha_X, m_X, alpha_Y, m_Y],
                             hasher_cost,
-                            updates=gradient_updates(hasher_cost,
-                                                     hasher.params,
-                                                     learning_rate))
+                            updates=gradient_updates_momentum(hasher_cost,
+                                                              hasher.params,
+                                                              learning_rate,
+                                                              momentum))
 
     # Randomly select some data vectors to plot every so often
     plot_indices_train = np.random.choice(X_train.shape[1], 20, False)
@@ -366,15 +381,15 @@ if __name__=='__main__':
                     # Get the network output for this dataset
                     X_output = hasher.X_net.output(X_set).eval()
                     Y_output = hasher.Y_net.output(Y_set).eval()
-                    # Compute and display metrics on the resulting hashes
-                    correct, in_class, collisions, out_of_class, hash_entropy_X, hash_entropy_Y = count_errors(Y_output > 0,
-                                                                                                               X_output > 0)
                     N = X_set.shape[1]
+                    # Compute and display metrics on the resulting hashes
+                    correct, in_class_mean, in_class_std = statistics(X_output > 0, Y_output > 0)
+                    collisions, out_of_class_mean, out_of_class_std = statistics(X_output[:, np.random.permutation(N)] > 0, Y_output > 0)
                     print "  {}/{} = {:.3f}% vectors hashed correctly".format(correct, N, correct/(1.*N)*100)
-                    print "  {:.3f} average in-class distance".format(in_class)
+                    print "  {:.3f} +/- {:.3f} average in-class distance".format(in_class_mean, in_class_std)
                     print "  {}/{} = {:.3f}% hash collisions".format(collisions, N, collisions/(1.*N)*100)
-                    print "  {:.3f} average out-of-class distance".format(out_of_class)
-                    print "  Entropy: {:.4f}, {:.4f}".format(hash_entropy_X, hash_entropy_Y, 2**n_bits)
+                    print "  {:.3f} +/- {:.3f} average out-of-class distance".format(out_of_class_mean, out_of_class_std)
+                    print "  Entropy: {:.4f}, {:.4f}".format(hash_entropy(X_output > 0), hash_entropy(Y_output > 0), 2**n_bits)
                     print
     
                     plt.figure(figsize=(18, 2))
