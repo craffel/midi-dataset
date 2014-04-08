@@ -349,40 +349,46 @@ if __name__=='__main__':
     # Store the cost at each iteration
     costs = np.zeros(n_iter)
 
-    for n, (X_p, Y_p, X_n, Y_n) in enumerate(get_next_batch(X_train, Y_train, 10, int(1e8))):
-        current_cost = train(X_p, X_n, Y_p, Y_n, alpha_XY_val, m_XY_val, alpha_X_val, m_X_val, alpha_Y_val, m_Y_val)
-        # Every so many iterations, print the cost and plot some diagnostic figures
-        if not n % 5000:
-            display.clear_output()
-            print "Iteration {}".format(n)
-            print "Cost: {}".format(current_cost)
-
-            # Get accuracy and diagnostic figures for both train and validation sets
-            for name, X_set, Y_set, plot_indices in [('Train', X_train, Y_train, plot_indices_train),
-                                                     ('Validate', X_validate, Y_validate, plot_indices_validate)]:
-                print
-                print name
-                # Get the network output for this dataset
-                X_output = X_eval(X_set)
-                Y_output = Y_eval(Y_set)
-                # Compute and display metrics on the resulting hashes
-                correct, in_class, collisions, out_of_class, hash_entropy_X, hash_entropy_Y = count_errors(Y_output > 0, X_output > 0)
-                N = X_set.shape[1]
-                print "  {}/{} = {:.3f}% vectors hashed correctly".format(correct, N, correct/(1.*N)*100)
-                print "  {:.3f} average in-class distance".format(in_class)
-                print "  {}/{} = {:.3f}% hash collisions".format(collisions, N, collisions/(1.*N)*100)
-                print "  {:.3f} average out-of-class distance".format(out_of_class)
-                print "  Entropy: {:.4f}, {:.4f}".format(hash_entropy_X, hash_entropy_Y, 2**n_bits)
-                print
-
-                plt.figure(figsize=(18, 2))
-                # Show images of each networks output, binaraized and nonbinarized, and the error
-                for n, image in enumerate([Y_output[:, plot_indices],
-                                           X_output[:, plot_indices],
-                                           Y_output[:, plot_indices] > 0,
-                                           X_output[:, plot_indices] > 0,
-                                           np.not_equal(X_output[:, plot_indices] > 0, Y_output[:, plot_indices] > 0)]):
-                    plt.subplot(1, 5, n + 1)
-                    plt.imshow(image, aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
-            plt.show()
+    try:
+        for n, (X_p, Y_p, X_n, Y_n) in enumerate(get_next_batch(X_train, Y_train, 10, n_iter)):
+            costs[n] = train(X_p, X_n, Y_p, Y_n, alpha_XY_val, m_XY_val, alpha_X_val, m_X_val, alpha_Y_val, m_Y_val)
+            # Every so many iterations, print the cost and plot some diagnostic figures
+            if not n % 5000:
+                display.clear_output()
+                print "Iteration {}".format(n)
+                print "Cost: {}".format(costs[n])
+    
+                # Get accuracy and diagnostic figures for both train and validation sets
+                for name, X_set, Y_set, plot_indices in [('Train', X_train, Y_train, plot_indices_train),
+                                                         ('Validate', X_validate, Y_validate, plot_indices_validate)]:
+                    print
+                    print name
+                    # Get the network output for this dataset
+                    X_output = hasher.X_net.output(X_set).eval()
+                    Y_output = hasher.Y_net.output(Y_set).eval()
+                    # Compute and display metrics on the resulting hashes
+                    correct, in_class, collisions, out_of_class, hash_entropy_X, hash_entropy_Y = count_errors(Y_output > 0,
+                                                                                                               X_output > 0)
+                    N = X_set.shape[1]
+                    print "  {}/{} = {:.3f}% vectors hashed correctly".format(correct, N, correct/(1.*N)*100)
+                    print "  {:.3f} average in-class distance".format(in_class)
+                    print "  {}/{} = {:.3f}% hash collisions".format(collisions, N, collisions/(1.*N)*100)
+                    print "  {:.3f} average out-of-class distance".format(out_of_class)
+                    print "  Entropy: {:.4f}, {:.4f}".format(hash_entropy_X, hash_entropy_Y, 2**n_bits)
+                    print
+    
+                    plt.figure(figsize=(18, 2))
+                    # Show images of each networks output, binaraized and nonbinarized, and the error
+                    for n, image in enumerate([Y_output[:, plot_indices],
+                                               X_output[:, plot_indices],
+                                               Y_output[:, plot_indices] > 0,
+                                               X_output[:, plot_indices] > 0,
+                                               np.not_equal(X_output[:, plot_indices] > 0, Y_output[:, plot_indices] > 0)]):
+                        plt.subplot(1, 5, n + 1)
+                        plt.imshow(image, aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
+                plt.show()
+    except KeyboardInterrupt:
+        costs = costs[:n]
+        plt.figure(figsize=(12, 12))
+        plt.plot(costs)
 
