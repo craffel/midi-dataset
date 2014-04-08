@@ -150,7 +150,7 @@ class SiameseNet(object):
         # Concatenate list of parameters
         self.params = self.X_net.params + self.Y_net.params
         
-    def cross_modality_cost(self, x_p, x_n, y_p, y_n, alpha_XY, m_XY, alpha_X, m_X, alpha_Y, m_y):
+    def cross_modality_cost(self, x_p, x_n, y_p, y_n, alpha_XY, m_XY, alpha_X, m_X, alpha_Y, m_Y):
         '''
         Compute the cost of encoding a set of positive and negative inputs from both modalities
         
@@ -384,7 +384,8 @@ if __name__=='__main__':
                     N = X_set.shape[1]
                     # Compute and display metrics on the resulting hashes
                     correct, in_class_mean, in_class_std = statistics(X_output > 0, Y_output > 0)
-                    collisions, out_of_class_mean, out_of_class_std = statistics(X_output[:, np.random.permutation(N)] > 0, Y_output > 0)
+                    collisions, out_of_class_mean, out_of_class_std = statistics(X_output[:, np.random.permutation(N)] > 0,
+                                                                                 Y_output > 0)
                     print "  {}/{} = {:.3f}% vectors hashed correctly".format(correct, N, correct/(1.*N)*100)
                     print "  {:.3f} +/- {:.3f} average in-class distance".format(in_class_mean, in_class_std)
                     print "  {}/{} = {:.3f}% hash collisions".format(collisions, N, collisions/(1.*N)*100)
@@ -406,4 +407,28 @@ if __name__=='__main__':
         costs = costs[:n]
         plt.figure(figsize=(12, 12))
         plt.plot(costs)
+
+# <codecell>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
