@@ -18,6 +18,7 @@ import pprint
 import collections
 import shutil
 import scipy.spatial
+import scipy.weave
 
 # <codecell>
 
@@ -94,13 +95,44 @@ def statistics(X, Y):
 
 # <codecell>
 
+def fast_binary_distance(X, Y):
+    '''
+    Compute the binary (matching) distance between all columns of X and all columns of Y
+    
+    Input:
+        X - M x N binary matrix
+        Y - M x K binary matrix
+    Output:
+        D - N x K distance matrix such that D[i, j] = sum(X[:, i] != Y[:, j])
+    '''
+    
+    (M, N) = X.shape
+    assert Y.shape[0] == M
+    (M, K) = Y.shape
+    assert X.dtype == np.bool
+    assert Y.dtype == np.bool
+
+    D = np.zeros((N, K), dtype=np.int)
+    
+    weaver = r"""
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < K; j++) {
+            for (int k = 0; k < M; k++) {
+                D[i*N + j] += X[k*N + i]^Y[k*N + j];
+            }
+        }
+    }
+"""
+    scipy.weave.inline(weaver, arg_names=['M', 'N', 'K', 'X', 'Y', 'D'])
+    return D
+
+# <codecell>
+
 def mean_reciprocal_rank(X, Y):
     ''' Computes the mean reciprocal rank of the correct codeword '''
     # Compute distances between each codeword and each other codeword
-    distance_matrix = scipy.spatial.distance.cdist(X.T, Y.T, 'matching')
+    distance_matrix = fast_binary_distance(X, Y)
     # Rank is the number of distances smaller than the correct distance, which is the value on the diagonal
-    print distance_matrix
-    print (distance_matrix.T <= np.diag(distance_matrix)).sum(axis=0)
     return np.mean(1./(distance_matrix.T <= np.diag(distance_matrix)).sum(axis=0))
 
 # <codecell>
@@ -134,6 +166,8 @@ improvement_threshold = 0.98
 patience_increase = 1.2
 # Maximum number of batches to train on
 max_iter = int(1e8)
+# Use this many samples to compute mean reciprocal rank
+n_mrr_samples = 1000
 
 # Possible values for each hyperparameter to take
 hp_values = collections.OrderedDict()
@@ -243,7 +277,9 @@ while True:
                 epoch_result[name + '_out_of_class_distance_std'] = out_of_class_std
                 epoch_result[name + '_hash_entropy_X'] = hash_entropy(X_output > 0)
                 epoch_result[name + '_hash_entropy_Y'] = hash_entropy(Y_output > 0)
-                epoch_result[name + '_mean_reciprocal_rank'] = mean_reciprocal_rank(X_output > 0, Y_output > 0)
+                mrr_samples = np.random.choice(N, n_mrr_samples, False)
+                epoch_result[name + '_mean_reciprocal_rank'] = mean_reciprocal_rank(X_output[:, mrr_samples] > 0,
+                                                                                    Y_output[:, mrr_samples] > 0)
             
             if epoch_result['validate_cost'] < improvement_threshold*current_validate_cost:
                 patience *= patience_increase
