@@ -17,6 +17,7 @@ import pickle
 import pprint
 import collections
 import shutil
+import scipy.spatial
 
 # <codecell>
 
@@ -90,6 +91,17 @@ def statistics(X, Y):
     return np.all(points_equal, axis=0).sum(), \
            np.mean(np.logical_not(points_equal).sum(axis=0)), \
            np.std(np.logical_not(points_equal).sum(axis=0))
+
+# <codecell>
+
+def mean_reciprocal_rank(X, Y):
+    ''' Computes the mean reciprocal rank of the correct codeword '''
+    # Compute distances between each codeword and each other codeword
+    distance_matrix = scipy.spatial.distance.cdist(X.T, Y.T, 'matching')
+    # Rank is the number of distances smaller than the correct distance, which is the value on the diagonal
+    print distance_matrix
+    print (distance_matrix.T <= np.diag(distance_matrix)).sum(axis=0)
+    return np.mean(1./(distance_matrix.T <= np.diag(distance_matrix)).sum(axis=0))
 
 # <codecell>
 
@@ -231,6 +243,7 @@ while True:
                 epoch_result[name + '_out_of_class_distance_std'] = out_of_class_std
                 epoch_result[name + '_hash_entropy_X'] = hash_entropy(X_output > 0)
                 epoch_result[name + '_hash_entropy_Y'] = hash_entropy(Y_output > 0)
+                epoch_result[name + '_mean_reciprocal_rank'] = mean_reciprocal_rank(X_output > 0, Y_output > 0)
             
             if epoch_result['validate_cost'] < improvement_threshold*current_validate_cost:
                 patience *= patience_increase
