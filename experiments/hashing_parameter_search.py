@@ -152,6 +152,21 @@ def parameter_space_1():
 
 # <codecell>
 
+def parameter_space_2():
+    # Possible values for each hyperparameter to take
+    hp_values = collections.OrderedDict()
+    hp_values['n_bits'] = np.random.choice([16, 24])
+    hp_values['n_layers'] = np.random.choice([3])
+    hp_values['alpha_XY'] = np.random.choice(np.array(np.linspace(0, 2, 201), dtype=theano.config.floatX))
+    hp_values['m_XY'] = np.random.choice(17)
+    hp_values['alpha_X'] = np.random.choice(np.array(np.linspace(0, 2, 201), dtype=theano.config.floatX))
+    hp_values['m_X'] = np.random.choice(17)
+    hp_values['alpha_Y'] = np.random.choice(np.array(np.linspace(0, 2, 201), dtype=theano.config.floatX))
+    hp_values['m_Y'] = np.random.choice(17)
+    return hp_values
+
+# <codecell>
+
 # First neural net, for chroma vectors
 X_p_input = T.matrix('X_p_input')
 X_n_input = T.matrix('X_n_input')
@@ -186,7 +201,7 @@ n_mrr_samples = 1000
 
 # Set up paths
 base_data_directory = '../data'
-result_directory = os.path.join(base_data_directory, 'parameter_search')
+result_directory = os.path.join(base_data_directory, 'parameter_search_2')
 training_data_directory = os.path.join(base_data_directory, 'hash_dataset')
 if not os.path.exists(result_directory):
     os.makedirs(result_directory)
@@ -207,7 +222,7 @@ Y_validate_n = Y_validate[:, np.random.permutation(Y_validate.shape[1])]
 
 while True:
     # Randomly choose a value for each hyperparameter
-    hp = parameter_space_1()
+    hp = parameter_space_2()
     # A list of results dicts, one per epoch
     epoch_results = []
     # Make a subdirectory for this parameter setting
