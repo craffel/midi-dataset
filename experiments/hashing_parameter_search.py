@@ -137,6 +137,21 @@ def mean_reciprocal_rank(X, Y):
 
 # <codecell>
 
+def parameter_space_1():
+    ''' Randomly sample the first parameter search space '''
+    hp_values = collections.OrderedDict()
+    hp_values['n_bits'] = np.random.choice([8, 12, 16])
+    hp_values['n_layers'] = np.random.choice([3, 4])
+    hp_values['alpha_XY'] = np.random.choice(np.array(np.linspace(0, 2, 201), dtype=theano.config.floatX))
+    hp_values['m_XY'] = np.random.choice(17)
+    hp_values['alpha_X'] = np.random.choice(np.array(np.linspace(0, 2, 201), dtype=theano.config.floatX))
+    hp_values['m_X'] = np.random.choice(17)
+    hp_values['alpha_Y'] = np.random.choice(np.array(np.linspace(0, 2, 201), dtype=theano.config.floatX))
+    hp_values['m_Y'] = np.random.choice(17)
+    return hp_values
+
+# <codecell>
+
 # First neural net, for chroma vectors
 X_p_input = T.matrix('X_p_input')
 X_n_input = T.matrix('X_n_input')
@@ -169,19 +184,6 @@ max_iter = 200*epoch_size
 # Use this many samples to compute mean reciprocal rank
 n_mrr_samples = 1000
 
-# Possible values for each hyperparameter to take
-hp_values = collections.OrderedDict()
-hp_values['n_bits'] = [8, 12, 16]
-hp_values['n_layers'] = [3, 4]
-hp_values['alpha_XY'] = np.array(np.linspace(0, 2, 201), dtype=theano.config.floatX)
-hp_values['m_XY'] = np.arange(17)
-hp_values['alpha_X'] = np.array(np.linspace(0, 2, 201), dtype=theano.config.floatX)
-hp_values['m_X'] = np.arange(17)
-hp_values['alpha_Y'] = np.array(np.linspace(0, 2, 201), dtype=theano.config.floatX)
-hp_values['m_Y'] = np.arange(17)
-# Current value of hyperparameters for one trial
-hp = collections.OrderedDict()
-
 # Set up paths
 base_data_directory = '../data'
 result_directory = os.path.join(base_data_directory, 'parameter_search')
@@ -205,8 +207,7 @@ Y_validate_n = Y_validate[:, np.random.permutation(Y_validate.shape[1])]
 
 while True:
     # Randomly choose a value for each hyperparameter
-    for hyperparameter, values in hp_values.items():
-        hp[hyperparameter] = np.random.choice(values)
+    hp = parameter_space_1()
     # A list of results dicts, one per epoch
     epoch_results = []
     # Make a subdirectory for this parameter setting
