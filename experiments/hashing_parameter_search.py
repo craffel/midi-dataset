@@ -165,7 +165,7 @@ improvement_threshold = 0.99
 # Amount to increase patience when validation cost has decreased
 patience_increase = 1.2
 # Maximum number of batches to train on
-max_iter = int(1e8)
+max_iter = 200*epoch_size
 # Use this many samples to compute mean reciprocal rank
 n_mrr_samples = 1000
 
@@ -288,15 +288,16 @@ while True:
                 mrr_samples = np.random.choice(N, n_mrr_samples, False)
                 epoch_result[name + '_mean_reciprocal_rank'] = mean_reciprocal_rank(X_output[:, mrr_samples] > 0,
                                                                                     Y_output[:, mrr_samples] > 0)
-            
-            if epoch_result['validate_cost'] < improvement_threshold*current_validate_cost:
-                patience *= patience_increase
-                print " ... increasing patience to {} because {} < {}*{}".format(patience,
-                                                                                 epoch_result['validate_cost'],
-                                                                                 improvement_threshold,
-                                                                                 current_validate_cost)
+
+            if epoch_result['validate_cost'] < current_validate_cost:
+                if epoch_result['validate_cost'] < improvement_threshold*current_validate_cost:
+                    patience *= patience_increase
+                    print " ... increasing patience to {} because {} < {}*{}".format(patience,
+                                                                                     epoch_result['validate_cost'],
+                                                                                     improvement_threshold,
+                                                                                     current_validate_cost)
                 current_validate_cost = epoch_result['validate_cost']
-                
+                    
             epoch_results.append(epoch_result)
             print '    patience : {}'.format(patience)
             print '    current_validation_cost : {}'.format(current_validate_cost)
