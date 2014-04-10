@@ -199,6 +199,9 @@ X_validate = (X_validate - X_mean)/X_std
 Y_mean, Y_std = standardize(Y_train)
 Y_train = (Y_train - Y_mean)/Y_std
 Y_validate = (Y_validate - Y_mean)/Y_std
+# Create fixed negative example validation set
+X_validate_n = X_validate[:, np.random.permutation(X_validate.shape[1])]
+Y_validate_n = Y_validate[:, np.random.permutation(Y_validate.shape[1])]
 
 while True:
     # Randomly choose a value for each hyperparameter
@@ -248,23 +251,28 @@ while True:
     patience = initial_patience/patience_increase 
     current_validate_cost = np.inf
     
+    # Functions for computing the neural net output on the train and validation sets
+    X_train_output = hasher.X_net.output(X_train)
+    Y_train_output = hasher.Y_net.output(Y_train)
+    X_validate_output = hasher.X_net.output(X_validate)
+    Y_validate_output = hasher.Y_net.output(Y_validate)
+    
     for n, (X_p, Y_p, X_n, Y_n) in enumerate(get_next_batch(X_train, Y_train, batch_size, max_iter)):
         train_cost = train(X_p, X_n, Y_p, Y_n, hp['alpha_XY'], hp['m_XY'], hp['alpha_X'], hp['m_X'], hp['alpha_Y'], hp['m_Y'])
         # Validate the net after each epoch
         if n and (not n % epoch_size):
             epoch_result = collections.OrderedDict()
             epoch_result['iteration'] = n
+            # Store current SGD cost
+            epoch_result['train_cost'] = train_cost
+            # Also compute validate cost (more stable)
+            epoch_result['validate_cost'] = cost(X_validate, X_validate_n, Y_validate, Y_validate_n, hp['alpha_XY'],
+                                                 hp['m_XY'], hp['alpha_X'], hp['m_X'], hp['alpha_Y'], hp['m_Y'])
             
             # Get accuracy and diagnostic figures for both train and validation sets
-            for name, X_p, Y_p in [('train', X_train, Y_train), ('validate', X_validate, Y_validate)]:
-                N = X_p.shape[1]
-                X_n = X_p[:, np.random.permutation(N)]
-                Y_n = Y_p[:, np.random.permutation(N)]
-                epoch_result[name + '_cost'] = cost(X_p, X_n, Y_p, Y_n, hp['alpha_XY'], hp['m_XY'], 
-                                                    hp['alpha_X'], hp['m_X'], hp['alpha_Y'], hp['m_Y'])
-                # Get the network output for this dataset
-                X_output = hasher.X_net.output(X_p).eval()
-                Y_output = hasher.Y_net.output(Y_p).eval()
+            for name, X_output, Y_output in [('train', X_train_output.eval(), Y_train_output.eval()),
+                                             ('validate', X_validate_output.eval(), Y_validate_output.eval())]:
+                N = X_output.shape[1]
                 # Compute and display metrics on the resulting hashes
                 correct, in_class_mean, in_class_std = statistics(X_output > 0, Y_output > 0)
                 collisions, out_of_class_mean, out_of_class_std = statistics(X_output[:, np.random.permutation(N)] > 0,
