@@ -80,7 +80,7 @@ def standardize(X):
 def hash_entropy(X):
         ''' Get the entropy of the histogram of hashes (want this to be close to n_bits) '''
         bit_values = np.sum(2**np.arange(X.shape[0]).reshape(-1, 1)*X, axis=0)
-        counts, _ = np.histogram(bit_values, np.arange(2**X.shape[0]))
+        counts = np.bincount(bit_values)
         counts = counts/float(counts.sum())
         return -np.sum(counts*np.log2(counts + 1e-100))
 
