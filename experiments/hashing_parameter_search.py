@@ -78,11 +78,15 @@ def standardize(X):
 # <codecell>
 
 def hash_entropy(X):
-        ''' Get the entropy of the histogram of hashes (want this to be close to n_bits) '''
-        bit_values = np.sum(2**np.arange(X.shape[0]).reshape(-1, 1)*X, axis=0)
-        counts = np.bincount(bit_values)
-        counts = counts/float(counts.sum())
-        return -np.sum(counts*np.log2(counts + 1e-100))
+    ''' Get the entropy of the histogram of hashes (want this to be close to n_bits) '''
+    # Convert bit vectors to ints
+    bit_values = np.sum(2**np.arange(X.shape[0]).reshape(-1, 1)*X, axis=0)
+    # Count the number of occurences of each int
+    counts = np.bincount(bit_values)
+    # Normalize to form a probability distribution
+    counts = counts/float(counts.sum())
+    # Compute entropy
+    return -np.sum(counts*np.log2(counts + 1e-100))
 
 # <codecell>
 
