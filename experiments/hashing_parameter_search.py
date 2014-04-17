@@ -99,12 +99,13 @@ def statistics(X, Y):
 
 # <codecell>
 
-def mean_reciprocal_rank(X, Y):
+def mean_reciprocal_rank(X, Y, indices):
     ''' Computes the mean reciprocal rank of the correct codeword '''
     # Compute distances between each codeword and each other codeword
     distance_matrix = scipy.spatial.distance.cdist(X.T, Y.T, metric='hamming')
-    # Rank is the number of distances smaller than the correct distance, which is the value on the diagonal
-    return np.mean(1./(distance_matrix.T <= np.diag(distance_matrix)).sum(axis=0))
+    # Rank is the number of distances smaller than the correct distance, as specified by the indices arg
+    return np.mean(1./(distance_matrix.T <= distance_matrix[np.arange(X.shape[1]), indices]).sum(axis=0)), \
+           np.mean(1./((distance_matrix.T < distance_matrix[np.arange(X.shape[1]), indices]).sum(axis=0) + 1))
 
 # <codecell>
 
@@ -179,6 +180,10 @@ if not os.path.exists(result_directory):
     
 # Load in the data
 X_train, Y_train, X_validate, Y_validate = load_data(training_data_directory)
+
+# Pre-compute indices over which to compute mrr
+mrr_samples = np.random.choice(X_validate.shape[1], n_mrr_samples, False)
+
 
 # Standardize
 X_mean, X_std = standardize(X_train)
@@ -272,7 +277,6 @@ while True:
                 epoch_result[name + '_out_of_class_distance_std'] = out_of_class_std
                 epoch_result[name + '_hash_entropy_X'] = hash_entropy(X_output > 0)
                 epoch_result[name + '_hash_entropy_Y'] = hash_entropy(Y_output > 0)
-                mrr_samples = np.random.choice(N, n_mrr_samples, False)
             if epoch_result['validate_cost'] < current_validate_cost:
                 if epoch_result['validate_cost'] < improvement_threshold*current_validate_cost:
                     patience *= patience_increase
@@ -282,8 +286,11 @@ while True:
                                                                                      current_validate_cost)
                 current_validate_cost = epoch_result['validate_cost']
             # Only compute MRR on validate
-            epoch_result[name + '_mean_reciprocal_rank'] = mean_reciprocal_rank(X_output[:, mrr_samples] > 0,
-                                                                                Y_output > 0)
+            mrr_pessimist, mrr_optimist = mean_reciprocal_rank(X_output[:, mrr_samples] > 0,
+                                                               Y_output > 0,
+                                                               mrr_samples)
+            epoch_result['validate_mrr_pessimist'] = mrr_pessimist
+            epoch_result['validate_mrr_optimist'] = mrr_optimist
 
             epoch_results.append(epoch_result)
             print '    patience : {}'.format(patience)
