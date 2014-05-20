@@ -31,8 +31,8 @@ pip-log.txt
 *.mat
 
 # Mac OS X cruft
-.DS_Store
-.DS_Store?
+*.DS_Store
+*.DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
@@ -41,3 +41,4 @@ Thumbs.db
 
 # IPython notebook
 .ipynb_checkpoints
+*.ipynb
