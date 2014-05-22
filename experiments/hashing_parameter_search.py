@@ -6,106 +6,13 @@
 import sys
 sys.path.append('../')
 import cross_modality_hashing
+import hashing_utils
 import numpy as np
 import theano.tensor as T
 import theano
-import glob
-import matplotlib.pyplot as plt
-from IPython import display
 import os
 import pickle
-import pprint
 import collections
-import shutil
-import scipy.spatial
-import scipy.weave
-
-# <codecell>
-
-def shingle(x, stacks):
-    ''' Shingle a matrix column-wise '''
-    return np.vstack([x[:, n:(x.shape[1] - stacks + n)] for n in xrange(stacks)])
-
-# <codecell>
-
-def load_data(directory, shingle_size=4, train_validate_split=.9):
-    ''' Load in all chroma matrices and piano rolls and output them as separate matrices '''
-    X_train = []
-    Y_train = []
-    X_validate = []
-    Y_validate = []
-    for chroma_filename in glob.glob(os.path.join(directory, '*-msd.npy')):
-        piano_roll_filename = chroma_filename.replace('msd', 'midi')
-        if np.random.rand() < train_validate_split:
-            X_train.append(shingle(np.load(chroma_filename), shingle_size))
-            Y_train.append(shingle(np.load(piano_roll_filename), shingle_size))
-        else:
-            X_validate.append(shingle(np.load(chroma_filename), shingle_size))
-            Y_validate.append(shingle(np.load(piano_roll_filename), shingle_size))
-    return np.array(np.hstack(X_train), dtype=theano.config.floatX, order='F'), \
-           np.array(np.hstack(Y_train), dtype=theano.config.floatX, order='F'), \
-           np.array(np.hstack(X_validate), dtype=theano.config.floatX, order='F'), \
-           np.array(np.hstack(Y_validate), dtype=theano.config.floatX, order='F')
-
-# <codecell>
-
-def get_next_batch(X, Y, batch_size, n_iter):
-    ''' Fast (hopefully) random mini batch generator '''
-    N = X.shape[1]
-    n_batches = int(np.floor(N/float(batch_size)))
-    current_batch = n_batches
-    for n in xrange(n_iter):
-        if current_batch >= n_batches:
-            positive_shuffle = np.random.permutation(N)
-            negative_shuffle = np.random.permutation(N)
-            X_p = np.array(X[:, positive_shuffle])
-            Y_p = np.array(Y[:, positive_shuffle])
-            #X_n = np.array(X[:, np.mod(negative_shuffle + 2*np.random.randint(0, 2, N) - 1, N)])
-            X_n = np.array(X[:, np.random.permutation(N)])
-            Y_n = np.array(Y[:, negative_shuffle])
-            current_batch = 0
-        batch = slice(current_batch*batch_size, (current_batch + 1)*batch_size)
-        yield X_p[:, batch], Y_p[:, batch], X_n[:, batch], Y_n[:, batch]
-        current_batch += 1
-
-# <codecell>
-
-def standardize(X):
-    ''' Return column vectors to standardize X, via (X - X_mean)/X_std '''
-    std = np.std(X, axis=1).reshape(-1, 1)
-    return np.mean(X, axis=1).reshape(-1, 1), std + (std == 0)
-
-# <codecell>
-
-def hash_entropy(X):
-    ''' Get the entropy of the histogram of hashes (want this to be close to n_bits) '''
-    # Convert bit vectors to ints
-    bit_values = np.sum(2**np.arange(X.shape[0]).reshape(-1, 1)*X, axis=0)
-    # Count the number of occurences of each int
-    counts = np.bincount(bit_values)
-    # Normalize to form a probability distribution
-    counts = counts/float(counts.sum())
-    # Compute entropy
-    return -np.sum(counts*np.log2(counts + 1e-100))
-
-# <codecell>
-
-def statistics(X, Y):
-    ''' Computes the number of correctly encoded codeworks and the number of bit errors made '''
-    points_equal = (X == Y)
-    return np.all(points_equal, axis=0).sum(), \
-           np.mean(np.logical_not(points_equal).sum(axis=0)), \
-           np.std(np.logical_not(points_equal).sum(axis=0))
-
-# <codecell>
-
-def mean_reciprocal_rank(X, Y, indices):
-    ''' Computes the mean reciprocal rank of the correct codeword '''
-    # Compute distances between each codeword and each other codeword
-    distance_matrix = scipy.spatial.distance.cdist(X.T, Y.T, metric='hamming')
-    # Rank is the number of distances smaller than the correct distance, as specified by the indices arg
-    return np.mean(1./(distance_matrix.T <= distance_matrix[np.arange(X.shape[1]), indices]).sum(axis=0)), \
-           np.mean(1./((distance_matrix.T < distance_matrix[np.arange(X.shape[1]), indices]).sum(axis=0) + 1))
 
 # <codecell>
 
@@ -179,19 +86,13 @@ if not os.path.exists(result_directory):
     os.makedirs(result_directory)
     
 # Load in the data
-X_train, Y_train, X_validate, Y_validate = load_data(training_data_directory)
+X, Y = hashing_utils.load_data(training_data_directory)
+# Split into train and validate and standardize
+X_train, Y_train, X_validate, Y_validate = hashing_utils.train_validate_split(X, Y)
 
 # Pre-compute indices over which to compute mrr
 mrr_samples = np.random.choice(X_validate.shape[1], n_mrr_samples, False)
 
-
-# Standardize
-X_mean, X_std = standardize(X_train)
-X_train = (X_train - X_mean)/X_std
-X_validate = (X_validate - X_mean)/X_std
-Y_mean, Y_std = standardize(Y_train)
-Y_train = (Y_train - Y_mean)/Y_std
-Y_validate = (Y_validate - Y_mean)/Y_std
 # Create fixed negative example validation set
 X_validate_n = X_validate[:, np.random.permutation(X_validate.shape[1])]
 Y_validate_n = Y_validate[:, np.random.permutation(Y_validate.shape[1])]
@@ -249,7 +150,7 @@ while True:
     X_validate_output = hasher.X_net.output(X_validate)
     Y_validate_output = hasher.Y_net.output(Y_validate)
     
-    for n, (X_p, Y_p, X_n, Y_n) in enumerate(get_next_batch(X_train, Y_train, batch_size, max_iter)):
+    for n, (X_p, Y_p, X_n, Y_n) in enumerate(hashing_utils.get_next_batch(X_train, Y_train, batch_size, max_iter)):
         train_cost = train(X_p, X_n, Y_p, Y_n, hp['alpha_XY'], hp['m_XY'], hp['alpha_X'], hp['m_X'], hp['alpha_Y'], hp['m_Y'])
         # Validate the net after each epoch
         if n and (not n % epoch_size):
@@ -266,17 +167,17 @@ while True:
                                              ('validate', X_validate_output.eval(), Y_validate_output.eval())]:
                 N = X_output.shape[1]
                 # Compute and display metrics on the resulting hashes
-                correct, in_class_mean, in_class_std = statistics(X_output > 0, Y_output > 0)
-                collisions, out_of_class_mean, out_of_class_std = statistics(X_output[:, np.random.permutation(N)] > 0,
-                                                                             Y_output > 0)
+                correct, in_class_mean, in_class_std = hashing_utils.statistics(X_output > 0, Y_output > 0)
+                collisions, out_of_class_mean, out_of_class_std = hashing_utils.statistics(X_output[:, np.random.permutation(N)] > 0,
+                                                                                           Y_output > 0)
                 epoch_result[name + '_accuracy'] = correct/float(N)
                 epoch_result[name + '_in_class_distance_mean'] = in_class_mean
                 epoch_result[name + '_in_class_distance_std'] = in_class_std
                 epoch_result[name + '_collisions'] = collisions/float(N)
                 epoch_result[name + '_out_of_class_distance_mean'] = out_of_class_mean
                 epoch_result[name + '_out_of_class_distance_std'] = out_of_class_std
-                epoch_result[name + '_hash_entropy_X'] = hash_entropy(X_output > 0)
-                epoch_result[name + '_hash_entropy_Y'] = hash_entropy(Y_output > 0)
+                epoch_result[name + '_hash_entropy_X'] = hashing_utils.hash_entropy(X_output > 0)
+                epoch_result[name + '_hash_entropy_Y'] = hashing_utils.hash_entropy(Y_output > 0)
             if epoch_result['validate_cost'] < current_validate_cost:
                 if epoch_result['validate_cost'] < improvement_threshold*current_validate_cost:
                     patience *= patience_increase
@@ -286,9 +187,9 @@ while True:
                                                                                      current_validate_cost)
                 current_validate_cost = epoch_result['validate_cost']
             # Only compute MRR on validate
-            mrr_pessimist, mrr_optimist = mean_reciprocal_rank(X_output[:, mrr_samples] > 0,
-                                                               Y_output > 0,
-                                                               mrr_samples)
+            mrr_pessimist, mrr_optimist = hashing_utils.mean_reciprocal_rank(X_output[:, mrr_samples] > 0,
+                                                                             Y_output > 0,
+                                                                             mrr_samples)
             epoch_result['validate_mrr_pessimist'] = mrr_pessimist
             epoch_result['validate_mrr_optimist'] = mrr_optimist
 
