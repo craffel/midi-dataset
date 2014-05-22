@@ -408,27 +408,3 @@ if __name__=='__main__':
         plt.figure(figsize=(12, 12))
         plt.plot(costs)
 
-# <codecell>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
