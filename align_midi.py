@@ -12,13 +12,14 @@ import copy
 
 # <codecell>
 
-def dpmod(M, pen=None):
+def dpmod(M, gully=.9, pen=None):
     '''
     Use dynamic programming to find a min-cost path through matrix M.
     
     Input:
         M - Matrix to find path through
-        pen - additional cost for for (0,1) and (1,0) steps, default None which means np.median(M)
+        gully - Sequences must match up to this proportion of shorter sequence, default .9
+        pen - additional cost for for (0,1) and (1,0) steps, default None which means np.percentile(M, 90)
     Output:
         p, q - State sequence
         score - DP score
@@ -26,19 +27,13 @@ def dpmod(M, pen=None):
     
     # Set penality = median(M) if none was provided
     if pen is None:
-        pen = np.median(M)
+        pen = np.percentile(M, 90)
     
     # Matrix of local costs, initialized to input matrix
     D = np.copy(M)
     
     # Store the traceback
     phi = np.zeros(D.shape)
-    # Handle first row/column, where we force back to the beginning
-    D[0, :] = np.cumsum(D[0, :]) + np.arange(D.shape[1])*pen
-    D[:, 0] = np.cumsum(D[:, 0]) + np.arange(D.shape[0])*pen
-    phi[0, :] = 2
-    phi[:, 0] = 1
-    phi[0, 0] = 0   
     
     for i in xrange(D.shape[0] - 1): 
         for j in xrange(D.shape[1] - 1):
@@ -53,9 +48,11 @@ def dpmod(M, pen=None):
             phi[i + 1, j + 1] = tb
     
     # Traceback from lowest-cost point on bottom or right edge
-    i = np.argmin(D[:, -1])
-    j = np.argmin(D[-1, :])
-    if D[i, -1] < D[-1, j]:
+    gully = int(gully*min(D.shape[0], D.shape[1]))
+    i = np.argmin(D[gully:, -1]) + gully
+    j = np.argmin(D[-1, gully:]) + gully
+    
+    if D[-1, j] > D[i, -1]:
         j = D.shape[1] - 1
     else:
         i = D.shape[0] - 1
@@ -68,7 +65,7 @@ def dpmod(M, pen=None):
     q = np.array([j])
     
     # Until we reach an edge
-    while i > 0 or j > 0:
+    while i > 0 and j > 0:
         # If the tracback matrix indicates a diagonal move...
         if phi[i, j] == 0:
             i = i - 1
@@ -387,15 +384,15 @@ if __name__ == '__main__':
             audio_gram = post_process_cqt(audio_gram, audio_beats)
             
             # Plot log-fs grams
-            plt.figure(figsize=(24, 24))
-            ax = plt.subplot2grid((4, 2), (0, 0), colspan=2)
+            plt.figure(figsize=(36, 24))
+            ax = plt.subplot2grid((4, 3), (0, 0), colspan=3)
             plt.title('MIDI Synthesized')
             librosa.display.specshow(midi_gram,
                                      x_axis='frames',
                                      y_axis='cqt_note',
                                      fmin=librosa.midi_to_hz(36),
                                      fmax=librosa.midi_to_hz(96))
-            ax = plt.subplot2grid((4, 2), (1, 0), colspan=2)
+            ax = plt.subplot2grid((4, 3), (1, 0), colspan=3)
             plt.title('Audio data')
             librosa.display.specshow(audio_gram,
                                      x_axis='frames',
@@ -409,9 +406,14 @@ if __name__ == '__main__':
             p, q, score = dpmod(similarity_matrix)
             # Store the score
             candidate_costs[n] = score
+            
+            # Plot distance at each point of the lowst-cost path
+            ax = plt.subplot2grid((4, 3), (2, 0), rowspan=2)
+            plt.plot([similarity_matrix[p_v, q_v] for p_v, q_v in zip(p, q)])
+            plt.title('Distance at each point on lowest-cost path')
     
             # Plot similarity matrix and best path through it
-            ax = plt.subplot2grid((4, 2), (2, 0), rowspan=2)
+            ax = plt.subplot2grid((4, 3), (2, 1), rowspan=2)
             plt.imshow(similarity_matrix.T,
                        aspect='auto',
                        interpolation='nearest',
@@ -427,7 +429,7 @@ if __name__ == '__main__':
             candidate_aligned_midi[midi_filename] = m_aligned
             
             # Plot alignment
-            ax = plt.subplot2grid((4, 2), (2, 1), rowspan=2)
+            ax = plt.subplot2grid((4, 3), (2, 2), rowspan=2)
             note_ons = np.array([note.start for instrument in m.instruments for note in instrument.events])
             aligned_note_ons = np.array([note.start for instrument in m_aligned.instruments for note in instrument.events])
             plt.plot(note_ons, aligned_note_ons - note_ons, '.')
@@ -438,6 +440,8 @@ if __name__ == '__main__':
             if output:
                 # Save the figure for all midi files, even the one that's not the best
                 plt.savefig(midi_filename.replace('midi', OUTPUT_PATH).replace('.mid', '.pdf'))
+            else:
+                plt.show()
             plt.close()
         
         # If all MIDI files failed, just return
@@ -480,6 +484,6 @@ if __name__ == '__main__':
             
     # Parallelization!
     mp3_glob = glob.glob(os.path.join(BASE_PATH, 'audio', '*.mp3'))
-    joblib.Parallel(n_jobs=6)(joblib.delayed(create_npys)(filename) for filename in mp3_glob)
-    joblib.Parallel(n_jobs=6)(joblib.delayed(align_one_file)(filename) for filename in mp3_glob)
+    joblib.Parallel(n_jobs=7)(joblib.delayed(create_npys)(filename) for filename in mp3_glob)
+    joblib.Parallel(n_jobs=7)(joblib.delayed(align_one_file)(filename) for filename in mp3_glob)
 
