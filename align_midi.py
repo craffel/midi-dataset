@@ -9,7 +9,7 @@ import copy
 
 # <codecell>
 
-def dpmod(M, gully=.9, pen=None):
+def dpmod(M, gully=.95, pen=None):
     '''
     Use dynamic programming to find a min-cost path through matrix M.
     
