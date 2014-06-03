@@ -6,7 +6,6 @@
 import numpy as np
 import librosa
 import copy
-import scipy.weave
 import numba
 
 # <codecell>
