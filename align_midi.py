@@ -7,6 +7,35 @@ import numpy as np
 import librosa
 import copy
 import scipy.weave
+import numba
+
+# <codecell>
+
+@numba.jit
+def dpcore(M, pen):
+    '''
+    Helper function for populating path cost and traceback matrices
+    '''
+    # Matrix of local costs, initialized to input matrix
+    D = np.copy(M, order='C')
+    # Store the traceback
+    phi = np.zeros(D.shape)
+    # At each loop iteration, we are computing lowest cost to D[i + 1, j + 1]
+    for i in xrange(D.shape[0] - 1):
+        for j in xrange(D.shape[1] - 1):
+            # Diagonal move (which has no penalty) is lowest
+            if D[i, j] <= D[i, j + 1] + pen and D[i, j] <= D[i + 1, j] + pen:
+                phi[i + 1, j + 1] = 0
+                D[i + 1, j + 1] += D[i, j]
+            # Horizontal move (has penalty)
+            elif D[i, j + 1] <= D[i + 1, j] and D[i, j + 1] + pen <= D[i, j]:
+                phi[i + 1, j + 1] = 1
+                D[i + 1, j + 1] += D[i, j + 1] + pen
+            # Vertical move (has penalty)
+            elif D[i + 1, j] <= D[i, j + 1] and D[i + 1, j] + pen <= D[i, j]:
+                phi[i + 1, j + 1] = 2
+                D[i + 1, j + 1] += D[i + 1, j] + pen
+    return D, phi
 
 # <codecell>
 
@@ -28,69 +57,8 @@ def dpmod(M, gully=.95, pen=None):
         pen = np.percentile(M, 90)
     pen = float(pen)
     
-    # Matrix of local costs, initialized to input matrix
-    D = np.copy(M, order='C')
-    
-    # Store the traceback
-    phi = np.zeros(D.shape)
-    
-    # The weave is equivalent to the following Python code:
-    '''
-    for i in xrange(D.shape[0] - 1): 
-        for j in xrange(D.shape[1] - 1):
-            # The possible locations we can move to, weighted by penalty score
-            next_moves = [D[i, j], pen + D[i, j + 1], pen + D[i + 1, j]]
-            # Choose the lowest cost
-            tb = np.argmin(next_moves)
-            dmin = next_moves[tb]
-            # Add in the cost
-            D[i + 1, j + 1] = D[i + 1, j + 1] + dmin
-            # Store the traceback
-            phi[i + 1, j + 1] = tb
-    '''
-    
-    nrow = D.shape[0]
-    ncol = D.shape[1]
-
-    weaver = r"""
-    double D_i_j = 0.0;
-    double D_i_jp1 = 0.0;
-    double D_ip1_j = 0.0;
-    for (int i = 0; i < nrow - 1; i++)
-    {
-        for (int j = 0; j < ncol - 1; j++)
-        {
-            D_i_j = D[i*ncol + j];
-            D_i_jp1 = pen + D[i*ncol + (j + 1)];
-            D_ip1_j = pen + D[(i + 1)*ncol + j];
-            if (D_i_j <= D_i_jp1)
-            {
-                if (D_i_j <= D_ip1_j)
-                {
-                    phi[(i + 1)*ncol + (j + 1)] = 0;
-                    D[(i + 1)*ncol + (j + 1)] += D_i_j;
-                }
-                else if (D_ip1_j <= D_i_jp1)
-                {
-                    phi[(i + 1)*ncol + (j + 1)] = 2;
-                    D[(i + 1)*ncol + (j + 1)] += D_ip1_j;
-                }
-            }
-            else if (D_i_jp1 <= D_ip1_j)
-            {
-                phi[(i + 1)*ncol + (j + 1)] = 1;
-                D[(i + 1)*ncol + (j + 1)] += D_i_jp1;
-            }
-            else if (D_ip1_j <= D_i_j)
-            {
-                phi[(i + 1)*ncol + (j + 1)] = 2;
-                D[(i + 1)*ncol + (j + 1)] += D_ip1_j;
-            }
-        }
-    }
-"""
-    
-    scipy.weave.inline(weaver, arg_names=['nrow', 'ncol', 'D', 'pen', 'phi'])
+    # Compute path cost matrix
+    D, phi = dpcore(M, pen)
     
     # Traceback from lowest-cost point on bottom or right edge
     gully = int(gully*min(D.shape[0], D.shape[1]))
