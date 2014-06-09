@@ -44,7 +44,7 @@ def dpmod(M, gully=.95, pen=None):
     
     Input:
         M - Matrix to find path through
-        gully - Sequences must match up to this proportion of shorter sequence, default .9
+        gully - Sequences must match up to this proportion of shorter sequence, default .95
         pen - additional cost for for (0,1) and (1,0) steps, default None which means np.percentile(M, 90)
     Output:
         p, q - State sequence
