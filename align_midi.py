@@ -133,13 +133,13 @@ def maptimes(t, intime, outtime):
 
 # <codecell>
 
-def midi_to_cqt(midi, method=None, fs=22050, hop=512):
+def midi_to_cqt(midi, sf2_path=None, fs=22050, hop=512):
     '''
     Feature extraction routine for midi data, converts to a drum-free, percussion-suppressed CQT.
     
     Input:
         midi - pretty_midi.PrettyMIDI object
-        method - synthesis method to pass to the midi object's synthesize method
+        sf2_path - path to .sf2 file to pass to pretty_midi.fluidsynth
         fs - sampling rate to synthesize audio at, default 22050
         hop - hop length for cqt, default 512
     Output:
@@ -151,8 +151,8 @@ def midi_to_cqt(midi, method=None, fs=22050, hop=512):
     for n, instrument in enumerate(midi_no_drums.instruments):
         if instrument.is_drum:
             del midi_no_drums.instruments[n]
-    # Synthesize the MIDI using the supplied method
-    midi_audio = midi_no_drums.synthesize(fs=fs, method=method)
+    # Synthesize the MIDI using the supplied sf2 path
+    midi_audio = midi_no_drums.fluidsynth(fs=fs, sf2_path=sf2_path)
     # Use the harmonic part of the signal
     H, P = librosa.decompose.hpss(librosa.stft(midi_audio))
     midi_audio_harmonic = librosa.istft(H)
