@@ -258,10 +258,10 @@ def adjust_midi(midi, original_times, new_times):
         aligned_midi - midi object with its times adjusted
     '''
     # Get array of note-on locations and correct them
-    note_ons = np.array([note.start for instrument in midi.instruments for note in instrument.events])
+    note_ons = np.array([note.start for instrument in midi.instruments for note in instrument.notes])
     aligned_note_ons = maptimes(note_ons, original_times, new_times)
     # Same for note-offs
-    note_offs = np.array([note.end for instrument in midi.instruments for note in instrument.events])
+    note_offs = np.array([note.end for instrument in midi.instruments for note in instrument.notes])
     aligned_note_offs = maptimes(note_offs, original_times, new_times)
     # Same for pitch bends
     pitch_bends = np.array([bend.time for instrument in midi.instruments for bend in instrument.pitch_bends])
@@ -269,7 +269,7 @@ def adjust_midi(midi, original_times, new_times):
     # Create copy (not doing this in place)
     midi_aligned = copy.deepcopy(midi)
     # Correct notes
-    for n, note in enumerate([note for instrument in midi_aligned.instruments for note in instrument.events]):
+    for n, note in enumerate([note for instrument in midi_aligned.instruments for note in instrument.notes]):
         note.start = (aligned_note_ons[n] > 0)*aligned_note_ons[n]
         note.end = (aligned_note_offs[n] > 0)*aligned_note_offs[n]
     # Correct pitch changes
