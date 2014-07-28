@@ -7,7 +7,6 @@ import numpy as np
 import scipy.spatial.distance
 import matplotlib.pyplot as plt
 import librosa
-import midi
 import pretty_midi
 import glob
 import subprocess
@@ -17,14 +16,11 @@ import sys
 sys.path.append('../')
 import align_midi
 import scipy.io
+import csv
 
 # <codecell>
 
 SF2_PATH = '../../Performer Synchronization Measure/SGM-V2.01.sf2'
-OUTPUT_PATH = 'midi-aligned-additive-dpmod'
-BASE_PATH = '../data/sanity'
-if not os.path.exists(os.path.join(BASE_PATH, OUTPUT_PATH)):
-    os.makedirs(os.path.join(BASE_PATH, OUTPUT_PATH))
 
 # <codecell>
 
@@ -58,7 +54,7 @@ def align_one_file(mp3_filename, midi_filename, output_midi_filename, output_dia
     '''
     # Load in the corresponding midi file in the midi directory, and return if there is a problem loading it
     try:
-        m = pretty_midi.PrettyMIDI(midi.read_midifile(midi_filename))
+        m = pretty_midi.PrettyMIDI(midi_filename)
     except:
         print "Error loading {}".format(midi_filename)
         return
@@ -96,7 +92,7 @@ def align_one_file(mp3_filename, midi_filename, output_midi_filename, output_dia
     
     # Compute beats
     midi_beats, bpm = align_midi.midi_beat_track(m)
-    audio_beats = librosa.beat.beat_track(onsets=audio_onset_strength, hop_length=512/4, bpm=bpm)[1]/4
+    audio_beats = librosa.beat.beat_track(onset_envelope=audio_onset_strength, hop_length=512/4, bpm=bpm)[1]/4
     # Beat-align and log/normalize the audio CQT
     audio_gram = align_midi.post_process_cqt(audio_gram, audio_beats)
     
@@ -190,10 +186,40 @@ def align_one_file(mp3_filename, midi_filename, output_midi_filename, output_dia
 
 # <codecell>
 
-# Parallelization!
-mp3_glob = sorted(glob.glob(os.path.join(BASE_PATH, 'audio', '*.mp3')))
-midi_glob = sorted(glob.glob(os.path.join(BASE_PATH, 'midi', '*.mid')))
+# What is the base data directory?
+BASE_PATH = '../data/cal10k'
+# Where should we write out results?
+OUTPUT_FOLDER = 'midi-aligned-additive-dpmod'
+# Where is the "Clean MIDIs" dataset located?
+CLEAN_MIDIS_PATH = '../data/Clean MIDIs'
+# Where's the tab-separated value file which maps files in the base dataset to the clean MIDIs?
+FILE_MAPPING = '../data/Clean MIDIs-path_to_cal10k_path.txt'
+
+# Create the output dir if it doesn't exist
+output_path = os.path.join(BASE_PATH, OUTPUT_FOLDER)
+if not os.path.exists(output_path):
+    os.makedirs(output_path)
+audio_path = os.path.join(BASE_PATH, 'audio')
+# This will be a list of tuples of an mp3 file, a matched midi, and the corresponding output name
+pairs = []
+
+# Read through rows in supplied mapping file
+with open(FILE_MAPPING) as f:
+    reader = csv.reader(f, delimiter='\t')
+    for row in reader:
+        # Extract the MIDI file name and the mp3 it was matched to
+        midi_filename = row[0]
+        mp3_filename = row[1]
+        # Construct an output filename
+        output_filename = "{}_vs_{}".format(mp3_filename.replace('/', '_'),
+                                            midi_filename.replace('/', '_'))
+        pairs.append((os.path.join(audio_path, mp3_filename),
+                      os.path.join(CLEAN_MIDIS_PATH, midi_filename),
+                      os.path.join(output_path, output_filename)))
+
+# Run alignment
 joblib.Parallel(n_jobs=7)(joblib.delayed(align_one_file)(mp3_filename,
                                                          midi_filename,
-                                                         midi_filename.replace('midi', OUTPUT_PATH))
-                                                         for mp3_filename, midi_filename in zip(mp3_glob, midi_glob))
+                                                         output_filename)
+                                                         for (mp3_filename, midi_filename, output_filename) in pairs)
+
