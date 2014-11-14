@@ -10,6 +10,8 @@
 import numpy as np
 import theano.tensor as T
 import theano
+import hashing_utils
+import collections
 
 # <codecell>
 
@@ -233,108 +235,91 @@ def gradient_updates_momentum(cost, params, learning_rate, momentum):
 
 # <codecell>
 
-if __name__=='__main__':
-    import glob
-    import matplotlib.pyplot as plt
-    from IPython import display
-
-    def shingle(x, stacks):
-        ''' Shingle a matrix column-wise '''
-        return np.vstack([x[:, n:(x.shape[1] - stacks + n)] for n in xrange(stacks)])
-
-    def load_data(directory, shingle_size=4, train_validate_split=.9):
-        ''' Load in all chroma matrices and piano rolls and output them as separate matrices '''
-        X_train = []
-        Y_train = []
-        X_validate = []
-        Y_validate = []
-        for chroma_filename in glob.glob(directory + '*-msd.npy'):
-            piano_roll_filename = chroma_filename.replace('msd', 'midi')
-            if np.random.rand() < train_validate_split:
-                X_train.append(shingle(np.load(chroma_filename), shingle_size))
-                Y_train.append(shingle(np.load(piano_roll_filename), shingle_size))
-            else:
-                X_validate.append(shingle(np.load(chroma_filename), shingle_size))
-                Y_validate.append(shingle(np.load(piano_roll_filename), shingle_size))
-        return np.array(np.hstack(X_train), dtype=theano.config.floatX, order='F'), \
-               np.array(np.hstack(Y_train), dtype=theano.config.floatX, order='F'), \
-               np.array(np.hstack(X_validate), dtype=theano.config.floatX, order='F'), \
-               np.array(np.hstack(Y_validate), dtype=theano.config.floatX, order='F')
-
-    def get_next_batch(X, Y, batch_size, n_iter):
-        ''' Fast (hopefully) random mini batch generator '''
-        N = X.shape[1]
-        n_batches = int(np.floor(N/float(batch_size)))
-        current_batch = n_batches
-        for n in xrange(n_iter):
-            if current_batch >= n_batches:
-                positive_shuffle = np.random.permutation(N)
-                negative_shuffle = np.random.permutation(N)
-                X_p = np.array(X[:, positive_shuffle])
-                Y_p = np.array(Y[:, positive_shuffle])
-                #X_n = np.array(X[:, np.mod(negative_shuffle + 2*np.random.randint(0, 2, N) - 1, N)])
-                X_n = np.array(X[:, np.random.permutation(N)])
-                Y_n = np.array(Y[:, negative_shuffle])
-                current_batch = 0
-            batch = slice(current_batch*batch_size, (current_batch + 1)*batch_size)
-            yield X_p[:, batch], Y_p[:, batch], X_n[:, batch], Y_n[:, batch]
-            current_batch += 1
-
-    def standardize(X):
-        ''' Return column vectors to standardize X, via (X - X_mean)/X_std '''
-        std = np.std(X, axis=1).reshape(-1, 1)
-        return np.mean(X, axis=1).reshape(-1, 1), std + (std == 0)
-
-    def hash_entropy(X):
-        ''' Get the entropy of the histogram of hashes (want this to be close to n_bits) '''
-        bit_values = np.sum(2**np.arange(X.shape[0]).reshape(-1, 1)*X, axis=0)
-        counts, _ = np.histogram(bit_values, np.arange(2**X.shape[0]))
-        counts = counts/float(counts.sum())
-        return -np.sum(counts*np.log2(counts + 1e-100))
-
-    def statistics(X, Y):
-        ''' Computes the number of correctly encoded codeworks and the number of bit errors made '''
-        points_equal = (X == Y)
-        return np.all(points_equal, axis=0).sum(), \
-               np.mean(np.logical_not(points_equal).sum(axis=0)), \
-               np.std(np.logical_not(points_equal).sum(axis=0))
-
-    # Load in the data
-    X_train, Y_train, X_validate, Y_validate = load_data('data/hash_dataset/')
-
-    # Standardize
-    X_mean, X_std = standardize(X_train)
-    X_train = (X_train - X_mean)/X_std
-    X_validate = (X_validate - X_mean)/X_std
-    Y_mean, Y_std = standardize(Y_train)
-    Y_train = (Y_train - Y_mean)/Y_std
-    Y_validate = (Y_validate - Y_mean)/Y_std
+def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
+                                hidden_layer_sizes_X, hidden_layer_sizes_Y,
+                                alpha_XY_val, m_XY_val, alpha_X_val, m_X_val,
+                                alpha_Y_val, m_Y_val, n_bits,
+                                learning_rate=1e-4, momentum=.9, batch_size=10,
+                                epoch_size=1000, initial_patience=10000,
+                                improvement_threshold=0.99, patience_increase=1.2,
+                                max_iter=200000, mrr_samples=None):
+    ''' Utility function for training a siamese net for cross-modality hashing
+    So many parameters.
+    Assumes, e.g., X_train[:, n] should be mapped close to Y_train[:, m] only when n == m
     
-    # Dimensionality of hamming space
-    n_bits = 16
-    # Number of layers in each network
-    n_layers = 3
-    
-    # Compute layer sizes.  Middle layers are nextpow2(input size)
-    layer_sizes_x = [X_train.shape[0]] + [int(2**np.ceil(np.log2(X_train.shape[0])))]*(n_layers - 1) + [n_bits]
-    layer_sizes_y = [Y_train.shape[0]] + [int(2**np.ceil(np.log2(Y_train.shape[0])))]*(n_layers - 1) + [n_bits]
-    hasher = SiameseNet(layer_sizes_x, layer_sizes_y)
+    :parameters:
+        - X_train : np.ndarray, shape=(n_features, n_train_examples)
+            Training data in X modality
+        - Y_train : np.ndarray, shape=(n_features, n_train_examples)
+            Training data in Y modality
+        - X_validate : np.ndarray, shape=(n_features, n_validate_examples)
+            Validation data in X modality
+        - Y_validate : np.ndarray, shape=(n_features, n_validate_examples)
+            Validation data in Y modality
+        - hidden_layer_sizes_X : list-like
+            Size of each hidden layer in X network.
+            Number of layers = len(hidden_layer_sizes_X) + 1
+        - hidden_layer_sizes_Y : list-like
+            Size of each hidden layer in Y network.
+            Number of layers = len(hidden_layer_sizes_Y) + 1
+        - alpha_XY_val : float
+            Scaling parameter for cross-modality negative example cost
+        - m_XY_val : int
+            Cross-modality negative example threshold
+        - alpha_X_val : float
+            Scaling parameter for X-modality negative example cost
+        - m_X_val : int
+            Y-modality negative example threshold
+        - alpha_Y_val : float
+            Scaling parameter for Y-modality negative example cost
+        - m_Y_val : int
+            Y-modality negative example threshold
+        - n_bits : int
+            Number of bits in the output representation
+        - learning_rate : float
+            SGD learning rate, default 1e-4
+        - momemntum : float
+            SGD momentum, default .9
+        - batch_size : int
+            Mini-batch size, default 10
+        - epoch_size : int
+            Number of mini-batches per epoch, default 1000
+        - initial_patience : int
+            Always train on at least this many batches, default 10000
+        - improvement_threshold : float
+            Validation cost must decrease by this factor to increase patience, default 0.99
+        - patience_increase : float
+            Amount to increase patience when validation cost has decreased, default 1.2
+        - max_iter : int
+            Maximum number of batches to train on, default 200000
+        - mrr_samples : np.ndarray
+            Indices of samples in the validation set over which to compute mean reciprocal rank.
+            Default None, which means use entire validation set.
 
-    # First neural net, for chroma vectors
+    :returns:
+        - epochs : list
+            List of epoch dicts, which contains scores computed at each epoch
+        - parameters : list
+            List of NN parameters after each epoch
+    '''
+    # First neural net, for X modality
     X_p_input = T.matrix('X_p_input')
     X_n_input = T.matrix('X_n_input')
     # Second neural net, for MIDI piano roll
     Y_p_input = T.matrix('Y_p_input')
     Y_n_input = T.matrix('Y_n_input')
-    # Hyperparameters
+    # Symbolic hyperparameters
     alpha_XY = T.scalar('alpha_XY')
     m_XY = T.scalar('m_XY')
     alpha_X = T.scalar('alpha_X')
     m_X = T.scalar('m_X')
     alpha_Y = T.scalar('alpha_Y')
     m_Y = T.scalar('m_Y')
-    learning_rate = 1e-4
-    momentum = .9
+    # Create siamese neural net hasher
+    layer_sizes_X = [X_train.shape[0]] + hidden_layer_sizes_X + [n_bits]
+    layer_sizes_Y = [Y_train.shape[0]] + hidden_layer_sizes_Y + [n_bits]
+    hasher = SiameseNet(layer_sizes_X, layer_sizes_Y)
+    
     # Create theano symbolic function for cost
     hasher_cost = hasher.cross_modality_cost(X_p_input, X_n_input, Y_p_input, Y_n_input,
                                              alpha_XY, m_XY, alpha_X, m_X, alpha_Y, m_Y)
@@ -346,65 +331,93 @@ if __name__=='__main__':
                                                               hasher.params,
                                                               learning_rate,
                                                               momentum))
+    # Compute cost without trianing
+    cost = theano.function([X_p_input, X_n_input, Y_p_input, Y_n_input,
+                            alpha_XY, m_XY, alpha_X, m_X, alpha_Y, m_Y], hasher_cost)
 
-    # Randomly select some data vectors to plot every so often
-    plot_indices_train = np.random.choice(X_train.shape[1], 20, False)
-    plot_indices_validate = np.random.choice(X_validate.shape[1], 20, False)
+    # Keep track of the patience - we will always increase the patience once
+    patience = initial_patience/patience_increase
+    current_validate_cost = np.inf
+    
+    # Functions for computing the neural net output on the train and validation sets
+    X_train_output = hasher.X_net.output(X_train)
+    Y_train_output = hasher.Y_net.output(Y_train)
+    X_validate_output = hasher.X_net.output(X_validate)
+    Y_validate_output = hasher.Y_net.output(Y_validate)
+    
+    # A list of epoch result dicts, one per epoch
+    epochs = []
+    # A list of parameter settings at each epoch
+    parameters = []
+    
+    # Create fixed negative example validation set
+    X_validate_n = X_validate[:, np.random.permutation(X_validate.shape[1])]
+    Y_validate_n = Y_validate[:, np.random.permutation(Y_validate.shape[1])]
 
-    # Value of m_{XY} to use
-    alpha_XY_val = 1
-    m_XY_val = 8
-    alpha_X_val = 1
-    m_X_val = 8
-    alpha_Y_val = 1
-    m_Y_val = 8
+    for n, (X_p, Y_p, X_n, Y_n) in enumerate(hashing_utils.get_next_batch(X_train, Y_train, batch_size, max_iter)):
+        train_cost = train(X_p, X_n, Y_p, Y_n, alpha_XY_val, m_XY_val, alpha_X_val, m_X_val, alpha_Y_val, m_Y_val)
+        # Validate the net after each epoch
+        if n and (not n % epoch_size):
+            epoch_result = collections.OrderedDict()
+            epoch_result['iteration'] = n
+            # Store current SGD cost
+            epoch_result['train_cost'] = train_cost
+            # Also compute validate cost (more stable)
+            epoch_result['validate_cost'] = cost(X_validate, X_validate_n, Y_validate, Y_validate_n, alpha_XY_val,
+                                                 m_XY_val, alpha_X_val, m_X_val, alpha_Y_val, m_Y_val)
+            
+            # Get accuracy and diagnostic figures for both train and validation sets
+            for name, X_output, Y_output in [('train', X_train_output.eval(), Y_train_output.eval()),
+                                             ('validate', X_validate_output.eval(), Y_validate_output.eval())]:
+                N = X_output.shape[1]
+                # Compute on the resulting hashes
+                correct, in_class_mean, in_class_std = hashing_utils.statistics(X_output > 0, Y_output > 0)
+                collisions, out_mean, out_std = hashing_utils.statistics(X_output[:, np.random.permutation(N)] > 0,
+                                                                         
+                                                                                           Y_output > 0)
+                epoch_result[name + '_accuracy'] = correct/float(N)
+                epoch_result[name + '_in_class_distance_mean'] = in_class_mean
+                epoch_result[name + '_in_class_distance_std'] = in_class_std
+                epoch_result[name + '_collisions'] = collisions/float(N)
+                epoch_result[name + '_out_of_class_distance_mean'] = out_mean
+                epoch_result[name + '_out_of_class_distance_std'] = out_std
+                epoch_result[name + '_hash_entropy_X'] = hashing_utils.hash_entropy(X_output > 0)
+                epoch_result[name + '_hash_entropy_Y'] = hashing_utils.hash_entropy(Y_output > 0)
+            if epoch_result['validate_cost'] < current_validate_cost:
+                if epoch_result['validate_cost'] < improvement_threshold*current_validate_cost:
+                    patience *= patience_increase
+                    print " ... increasing patience to {} because {} < {}*{}".format(patience,
+                                                                                     epoch_result['validate_cost'],
+                                                                                     improvement_threshold,
+                                                                                     current_validate_cost)
+                current_validate_cost = epoch_result['validate_cost']
+            # Only compute MRR on validate
+            mrr_pessimist, mrr_optimist = hashing_utils.mean_reciprocal_rank(X_output[:, mrr_samples] > 0,
+                                                                             Y_output > 0,
+                                                                             mrr_samples)
+            epoch_result['validate_mrr_pessimist'] = mrr_pessimist
+            epoch_result['validate_mrr_optimist'] = mrr_optimist
+            
+            # Store scores and statistics for this epoch
+            epochs.append(epoch_result)
+            
+            # Get current parameter settings
+            current_parameters = collections.OrderedDict()
+            for net_name, net in zip(['X_net', 'Y_net'], [hasher.X_net, hasher.Y_net]):
+                for n, layer in enumerate(net.layers):
+                    for parameter in layer.params:
+                        current_parameters["{}_layer_{}_{}".format(net_name, n, parameter.name)] = parameter.get_value()
+            # Store parameters for this epoch
+            parameters.append(current_parameters)
+            
+            print '    patience : {}'.format(patience)
+            print '    current_validation_cost : {}'.format(current_validate_cost)
+            for k, v in epoch_result.items():
+                print '    {} : {}'.format(k, round(v, 3))
+            print
+            
+        if n > patience:
+            break
     
-    # Maximum number of iterations to run
-    n_iter = int(1e8)
-    # Store the cost at each iteration
-    costs = np.zeros(n_iter)
-
-    try:
-        for n, (X_p, Y_p, X_n, Y_n) in enumerate(get_next_batch(X_train, Y_train, 10, n_iter)):
-            costs[n] = train(X_p, X_n, Y_p, Y_n, alpha_XY_val, m_XY_val, alpha_X_val, m_X_val, alpha_Y_val, m_Y_val)
-            # Every so many iterations, print the cost and plot some diagnostic figures
-            if not n % 5000:
-                display.clear_output()
-                print "Iteration {}".format(n)
-                print "Cost: {}".format(costs[n])
-    
-                # Get accuracy and diagnostic figures for both train and validation sets
-                for name, X_set, Y_set, plot_indices in [('Train', X_train, Y_train, plot_indices_train),
-                                                         ('Validate', X_validate, Y_validate, plot_indices_validate)]:
-                    print
-                    print name
-                    # Get the network output for this dataset
-                    X_output = hasher.X_net.output(X_set).eval()
-                    Y_output = hasher.Y_net.output(Y_set).eval()
-                    N = X_set.shape[1]
-                    # Compute and display metrics on the resulting hashes
-                    correct, in_class_mean, in_class_std = statistics(X_output > 0, Y_output > 0)
-                    collisions, out_of_class_mean, out_of_class_std = statistics(X_output[:, np.random.permutation(N)] > 0,
-                                                                                 Y_output > 0)
-                    print "  {}/{} = {:.3f}% vectors hashed correctly".format(correct, N, correct/(1.*N)*100)
-                    print "  {:.3f} +/- {:.3f} average in-class distance".format(in_class_mean, in_class_std)
-                    print "  {}/{} = {:.3f}% hash collisions".format(collisions, N, collisions/(1.*N)*100)
-                    print "  {:.3f} +/- {:.3f} average out-of-class distance".format(out_of_class_mean, out_of_class_std)
-                    print "  Entropy: {:.4f}, {:.4f}".format(hash_entropy(X_output > 0), hash_entropy(Y_output > 0), 2**n_bits)
-                    print
-    
-                    plt.figure(figsize=(18, 2))
-                    # Show images of each networks output, binaraized and nonbinarized, and the error
-                    for n, image in enumerate([Y_output[:, plot_indices],
-                                               X_output[:, plot_indices],
-                                               Y_output[:, plot_indices] > 0,
-                                               X_output[:, plot_indices] > 0,
-                                               np.not_equal(X_output[:, plot_indices] > 0, Y_output[:, plot_indices] > 0)]):
-                        plt.subplot(1, 5, n + 1)
-                        plt.imshow(image, aspect='auto', interpolation='nearest', vmin=-1, vmax=1)
-                plt.show()
-    except KeyboardInterrupt:
-        costs = costs[:n]
-        plt.figure(figsize=(12, 12))
-        plt.plot(costs)
+    return epochs, parameters
 
