@@ -20,10 +20,6 @@ import csv
 
 # <codecell>
 
-SF2_PATH = '../../Performer Synchronization Measure/SGM-V2.01.sf2'
-
-# <codecell>
-
 # Utility functions for converting between filenames
 def to_cqt_npy(filename):
     ''' Given some/path/file.mid or .mp3, return some/path/file_cqt.npy '''
@@ -80,7 +76,7 @@ def align_one_file(mp3_filename, midi_filename, output_midi_filename, output_dia
     if not os.path.exists(to_cqt_npy(midi_filename)):      
         print "Creating CQT for {}".format(os.path.split(midi_filename)[1])
         # Generate synthetic MIDI CQT
-        midi_gram = align_midi.midi_to_cqt(m, SF2_PATH)
+        midi_gram = align_midi.midi_to_cqt(m)
         # Get beats
         midi_beats, bpm = align_midi.midi_beat_track(m)
         # Beat synchronize and normalize
@@ -160,7 +156,7 @@ def align_one_file(mp3_filename, midi_filename, output_midi_filename, output_dia
         # Load in the audio data (needed for writing out)
         audio, fs = librosa.load(mp3_filename, sr=None)
         # Synthesize the aligned midi
-        midi_audio_aligned = m_aligned.fluidsynth(fs=fs, sf2_path=SF2_PATH)
+        midi_audio_aligned = m_aligned.fluidsynth(fs=fs)
         # Trim to the same size as audio
         if midi_audio_aligned.shape[0] > audio.shape[0]:
             midi_audio_aligned = midi_audio_aligned[:audio.shape[0]]
