@@ -58,7 +58,11 @@ def align_one_file(mp3_filename, midi_filename, output_midi_filename, output_dia
     except:
         print "Error loading {}".format(midi_filename)
         return
-        
+    
+    if os.path.exists(output_midi_filename.replace('.mid', '.mat')):
+        print 'Skipping {}'.format(os.path.split(midi_filename)[1])
+        return
+    
     print "Aligning {}".format(os.path.split(midi_filename)[1])
     
     # Cache audio CQT and onset strength
@@ -218,8 +222,6 @@ with open(FILE_MAPPING) as f:
                       os.path.join(output_path, output_filename)))
 
 # Run alignment
-joblib.Parallel(n_jobs=7)(joblib.delayed(align_one_file)(mp3_filename,
-                                                         midi_filename,
-                                                         output_filename)
+joblib.Parallel(n_jobs=6)(joblib.delayed(align_one_file)(mp3_filename, midi_filename, output_filename)
                                                          for (mp3_filename, midi_filename, output_filename) in pairs)
 
