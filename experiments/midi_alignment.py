@@ -156,7 +156,7 @@ def align_one_file(mp3_filename, midi_filename, output_midi_filename, output_dia
     
     if output_diagnostics:
         # Save the figures
-        plt.savefig(output_midi_filename.replace('.mid', '.pdf'))
+        plt.savefig(os.path.splitext(output_midi_filename)[0] + '.pdf')
         # Load in the audio data (needed for writing out)
         audio, fs = librosa.load(mp3_filename, sr=None)
         # Synthesize the aligned midi
@@ -167,20 +167,20 @@ def align_one_file(mp3_filename, midi_filename, output_midi_filename, output_dia
         else:
             midi_audio_aligned = np.append(midi_audio_aligned, np.zeros(audio.shape[0] - midi_audio_aligned.shape[0]))
         # Write out to temporary .wav file
-        librosa.output.write_wav(output_midi_filename.replace('.mid', '.wav'),
+        librosa.output.write_wav(os.path.splitext(output_midi_filename)[0] + '.wav',
                                  np.vstack([midi_audio_aligned, audio]).T, fs)
         # Convert to mp3
         subprocess.check_output(['ffmpeg',
                          '-i',
-                         output_midi_filename.replace('.mid', '.wav'),
+                         os.path.splitext(output_midi_filename)[0] + '.wav',
                          '-ab',
                          '128k',
                          '-y',
-                         output_midi_filename.replace('.mid', '.mp3')])
+                         os.path.splitext(output_midi_filename)[0] + '.mp3'])
         # Remove temporary .wav file
-        os.remove(output_midi_filename.replace('.mid', '.wav'))
+        os.remove(os.path.splitext(output_midi_filename)[0] + '.wav')
         # Save a .mat of the results
-        scipy.io.savemat(output_midi_filename.replace('.mid', '.mat'),
+        scipy.io.savemat(os.path.splitext(output_midi_filename)[0] + '.mat',
                          {'similarity_matrix': similarity_matrix,
                           'p': p, 'q': q, 'score': score})
     # If we aren't outputting a .pdf, show the plot
