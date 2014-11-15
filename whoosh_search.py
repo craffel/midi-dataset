@@ -3,8 +3,6 @@
 
 # <codecell>
 
-import numpy as np
-import csv
 import whoosh, whoosh.fields, whoosh.index, whoosh.analysis, whoosh.qparser
 from whoosh.support.charset import accent_map
 import os
@@ -54,28 +52,27 @@ def get_msd_list(csv_file):
         msd_list[n] = line
     return msd_list
 
-# <codecell>
 
-def get_cal10k_list(csv_file):
+def get_tsv_list(tsv_file, skiplines=0):
     '''
     Parses the EchoNestTrackIDs.tab file into a python list of lists.
-    
+
     Input:
-        csv_file - path to unique_tracks.txt
+        tsv_file - path to EchoNestTrackIDs.tab
     Output:
         cal10k_list - list of lists, each list contains track_id, artist, title
     '''
-    cal10k_list = []
-    with open(csv_file, 'rb') as f:
+    tsv_list = []
+    with open(tsv_file, 'rb') as f:
         for line in f:
             fields = line.split('\t')
-            cal10k_list += [[fields[0], fields[1], fields[2]]]
+            tsv_list += [[fields[0], fields[1], fields[2]]]
     # Remove first line - labels
-    cal10k_list = cal10k_list[1:]
-    for n, line in enumerate( cal10k_list ):
+    tsv_list = tsv_list[skiplines:]
+    for n, line in enumerate(tsv_list):
         line = [unicode(a.rstrip(), encoding='utf-8') for a in line]
-        cal10k_list[n] = line
-    return cal10k_list
+        tsv_list[n] = line
+    return tsv_list
 
 # <codecell>
 
@@ -140,12 +137,27 @@ def search( searcher, schema, artist, title, threshold=20 ):
     
     return result
 
-# <codecell>
 
-if __name__=='__main__':
+if __name__ == '__main__':
     import os
-    if not os.path.exists('Whoosh Indices/cal10k_index/'):
-        create_index('Whoosh Indices/cal10k_index/', get_cal10k_list('File Lists/EchoNestTrackIDs.tab') )
-    index = get_whoosh_index('Whoosh Indices/cal10k_index/')
-    print search( index.searcher(), index.schema, 'queen', 'under pressure' )
-
+    if not os.path.exists('whoosh_indices/cal500_index/'):
+        create_index('whoosh_indices/cal500_index/',
+                     get_tsv_list('File Lists/cal500.txt'))
+    if not os.path.exists('whoosh_indices/cal10k_index/'):
+        create_index('whoosh_indices/cal10k_index/',
+                     get_tsv_list('File Lists/EchoNestTrackIDs.tab', 1))
+    if not os.path.exists('whoosh_indices/msd_index/'):
+        create_index('whoosh_indices/msd_index/',
+                     get_msd_list('File Lists/unique_tracks.txt'))
+    index = get_whoosh_index('whoosh_indices/cal500_index/')
+    with index.searcher() as searcher:
+        print 'cal500:\t{}'.format(search(searcher, index.schema,
+                                         'bon jovi', 'livin on a prayer'))
+    index = get_whoosh_index('whoosh_indices/cal10k_index/')
+    with index.searcher() as searcher:
+        print 'cal10k:\t{}'.format(search(searcher, index.schema,
+                                         'bon jovi', 'livin on a prayer'))
+    index = get_whoosh_index('whoosh_indices/msd_index/')
+    with index.searcher() as searcher:
+        print 'msd:\t{}'.format(search(searcher, index.schema,
+                                      'bon jovi', 'livin on a prayer'))
