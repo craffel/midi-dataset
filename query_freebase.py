@@ -74,14 +74,14 @@ def normalize(artists, titles):
     if type(artists) == str or type(artists) == unicode:
         artists = [artists]
 
-    for query_artist in artists or type(artists) == unicode:
+    for query_artist in artists:
         artist = artist_match(query_artist)
         if artist is not None:
             break
     if artist is None:
         return None, None
 
-    if type(titles) == str:
+    if type(titles) == str or type(artists) == unicode:
         titles = [titles]
 
     for query_title in titles:
