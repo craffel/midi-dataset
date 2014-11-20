@@ -47,10 +47,17 @@ def echonest_normalize_artist(artists):
     en = pyen.Pyen(api_key=ECHONEST_KEY)
 
     for query_artist in artists:
-        response = en.get('artist/search',
-                          name=clean(query_artist),
-                          results=5,
-                          fuzzy_match='true')
+        success = False
+        while not success:
+            try:
+                response = en.get('artist/search',
+                                  name=clean(query_artist),
+                                  results=5,
+                                  fuzzy_match='true')
+            except pyen.PyenException as e:
+                print e.message, e.args
+                continue
+            success = True
         if len(response['artists']) > 0:
             for matched_artist in response['artists']:
                 matched_artists.append(matched_artist['name'])
@@ -76,7 +83,7 @@ def freebase_normalize_title(artists, titles):
         - title: str or NoneType
             Freebase's purported title or None if no match
     '''
-    def title_match(artist, title, old_correction=None):
+    def title_match(artist, title, old_correction=False):
         ''' Match a song title with some artist using freebase '''
         filter_str = '(all type:/music/recording /music/recording/artist:"{}")'
         params = {'query': clean(title),
@@ -85,17 +92,26 @@ def freebase_normalize_title(artists, titles):
                   'key': FREEBASE_KEY,
                   'spell': 'always'}
         url = FREEBASE_URL + urllib.urlencode(params)
-        response = json.loads(urllib.urlopen(url).read())
+        success = False
+        while not success:
+            try:
+                response = json.loads(urllib.urlopen(url).read())
+            except Exception as e:
+                print e.message, e.args
+                continue
+            if 'result' in response:
+                success = True
+            else:
+                print 'result not in response: {}'.format(response)
         if len(response['result']) > 0:
             return response['result'][0]['name']
         if 'correction' in response:
-            correction = response['correction'][0]
-            if correction == old_correction:
+            if old_correction:
                 return None
             else:
                 return title_match(artist,
                                    response['correction'][0],
-                                   correction)
+                                   True)
         return None
 
     if type(artists) == str or type(artists) == unicode:
