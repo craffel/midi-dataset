@@ -32,46 +32,35 @@ def create_index_writer(index_path):
     return index.writer()
 
 
-def get_msd_list(csv_file):
+def get_sv_list(sv_file, delimiter='\t', skiplines=0):
     '''
-    Parses the unique_tracks.txt file into a python list of lists.
+    Parses a delimiter-separated value file where each line has the format
 
-    Input:
-        csv_file - path to unique_tracks.txt
-    Output:
-        msd_list - list of lists, each list contains track_id, artist, title
+    track_id (delimiter) artist (delimiter) title (delimiter) ignored ...
+
+    :parameters:
+        - sv_file : str
+            Path to the separated value file
+        - skiplines : int
+            Number of lines to skip at the beginning of the file
+        - delimiter : str
+            Delimiter used to separate values
+
+    :returns:
+        - sv_list : list of list
+            Each list contains track_id, artist, title
     '''
-    msd_list = []
-    with open(csv_file, 'rb') as f:
-        for line in f:
-            fields = line.split('<SEP>')
-            msd_list += [[fields[0], fields[2], fields[3]]]
-    for n, line in enumerate(msd_list):
-        line = [unicode(a.rstrip(), encoding='utf-8') for a in line]
-        msd_list[n] = line
-    return msd_list
-
-
-def get_tsv_list(tsv_file, skiplines=0):
-    '''
-    Parses the EchoNestTrackIDs.tab file into a python list of lists.
-
-    Input:
-        tsv_file - path to EchoNestTrackIDs.tab
-    Output:
-        cal10k_list - list of lists, each list contains track_id, artist, title
-    '''
-    tsv_list = []
-    with open(tsv_file, 'rb') as f:
+    sv_list = []
+    with open(sv_file, 'rb') as f:
         for line in f:
             fields = line.split('\t')
-            tsv_list += [[fields[0], fields[1], fields[2]]]
+            sv_list.append([fields[0], fields[1], fields[2]])
     # Remove first line - labels
-    tsv_list = tsv_list[skiplines:]
-    for n, line in enumerate(tsv_list):
+    sv_list = sv_list[skiplines:]
+    for n, line in enumerate(sv_list):
         line = [unicode(a.rstrip(), encoding='utf-8') for a in line]
-        tsv_list[n] = line
-    return tsv_list
+        sv_list[n] = line
+    return sv_list
 
 
 # Code from Brian McFee
@@ -140,22 +129,35 @@ if __name__ == '__main__':
     import os
     if not os.path.exists('whoosh_indices/cal500_index/'):
         create_index('whoosh_indices/cal500_index/',
-                     get_tsv_list('File Lists/cal500.txt'))
+                     get_sv_list('file_lists/cal500.txt'))
     if not os.path.exists('whoosh_indices/cal10k_index/'):
         create_index('whoosh_indices/cal10k_index/',
-                     get_tsv_list('File Lists/EchoNestTrackIDs.tab', 1))
+                     get_sv_list('file_lists/EchoNestTrackIDs.tab',
+                                 skiplines=1))
     if not os.path.exists('whoosh_indices/msd_index/'):
         create_index('whoosh_indices/msd_index/',
-                     get_msd_list('File Lists/unique_tracks.txt'))
+                     get_sv_list('file_lists/unique_tracks.txt',
+                                 delimiter='<SEP>'))
+    if not os.path.exists('whoosh_indices/clean_midis_index/'):
+        create_index('whoosh_indices/clean_midis_index/',
+                     get_sv_list('file_lists/clean_midis.txt'))
+
+    artist = 'bon jovi'
+    title = 'livin on a prayer'
+
     index = get_whoosh_index('whoosh_indices/cal500_index/')
     with index.searcher() as searcher:
         print 'cal500:\t{}'.format(search(searcher, index.schema,
-                                         'bon jovi', 'livin on a prayer'))
+                                          artist, title))
     index = get_whoosh_index('whoosh_indices/cal10k_index/')
     with index.searcher() as searcher:
         print 'cal10k:\t{}'.format(search(searcher, index.schema,
-                                         'bon jovi', 'livin on a prayer'))
+                                          artist, title))
     index = get_whoosh_index('whoosh_indices/msd_index/')
     with index.searcher() as searcher:
-        print 'msd:\t{}'.format(search(searcher, index.schema,
-                                      'bon jovi', 'livin on a prayer'))
+        print 'msd:\t{}'.format(search(searcher, index.schema, artist, title))
+
+    index = get_whoosh_index('whoosh_indices/clean_midis_index/')
+    with index.searcher() as searcher:
+        print 'clean_midis:\t{}'.format(search(searcher, index.schema,
+                                               artist, title))
