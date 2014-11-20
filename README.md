@@ -23,7 +23,7 @@ The MSD:
 
 1. About 500,000 MIDI files were scraped from the internet.  About half of them are duplicates.  Metadata (specifically, song title and artist) is sometimes included in MIDI files as text meta events, but more frequently the filename/subdirectory is used as a way of denoting the artist/song title.
 1. We manually found about 25,000 non-duplicate MIDI files which had clean metadata information in their filename/subdirectory.  We did some manual cleaning/merging to make their "metadata" as sane as possible.
-1. For each file in the "clean MIDI subset", we resolved the purported artist/title name against Freebase and the Echonest.  Code for this step is in `normalize_names.py`.
+1. For each file in the "clean MIDI subset", we resolved the purported artist/title name against Freebase and the Echonest.  Code for this step is in `normalize_names.py`.  This resulted in about 17,000 MIDI files for about 9,000 unique tracks.
 1. For each of the datasets, we created Whoosh indices.  These are used to match an entry in one dataset (usually the clean MIDI dataset) to an entry in another (one of cal500, cal10k, uspop2002, or MSD).  Code for this step is in `whoosh_search.py` (redo this step using a fuzzy text match or something non-whoosh)
 1. Using Whoosh, we matched each entry in the clean MIDI subset to mp3 files from cal500/cal10k/uspop2002.  For the files that matched, we attempted to align the MIDI file to the matching audio file (using [align_midi](https://github.com/craffel/align_midi)).  Code for this step is in `midi_alignment.py` (TODO-re-run alignment)
 1. Once we ran the alignment, we manually verified whether the alignment was successful or not.  The resulting valid/invalid labels are collected in xyz.tsv (TODO - verify alignmenet output)
