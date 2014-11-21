@@ -12,10 +12,13 @@ def create_index_writer(index_path):
     '''
     Constructs a whoosh index writer, which has ID, artist and title fields
 
-    Input:
-        index_path - Path to whoosh index to be written
-    Output:
-        index - Whoosh index writer
+    :parameters:
+        - index_path : str
+            Path to whoosh index to be written
+
+    :returns:
+        - index : whoosh.writing.IndexWriter
+            Whoosh index writer
     '''
     if not os.path.exists(index_path):
         os.mkdir(index_path)
@@ -68,9 +71,11 @@ def create_index(index_path, track_list):
     '''
     Creates a whoosh index directory for the MSD
 
-    Input:
-        index_path - where to create the whoosh index
-        track_list - list of lists, each list contains track_id, artist, title
+    :parameters:
+        - index_path : str
+            where to create the whoosh index
+        - track_list : list of list of str
+            list of lists, each list contains track_id, artist, title
     '''
 
     writer = create_index_writer(index_path)
@@ -88,9 +93,10 @@ def get_whoosh_index(index_path):
     '''
     Get a whoosh searcher object from a whoosh index path
 
-    Input:
+    :parameters:
         index_path - path to whoosh index
-    Output:
+
+    :returns:
         index - whoosh index
     '''
     return whoosh.index.open_dir(index_path)
@@ -117,7 +123,7 @@ def search(searcher, schema, artist, title, threshold=20):
         - threshold : float
             A result must have a score higher than this to be a match
 
-    :return:
+    :returns:
         - matches : list of list
             List of match lists of the form [id, artist, title]
     '''
