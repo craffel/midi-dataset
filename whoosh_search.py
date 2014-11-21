@@ -100,29 +100,38 @@ def search(searcher, schema, artist, title, threshold=20):
     '''
     Search for an artist - title pair and return the best match
 
-    Input:
-        searcher - whoosh searcher
-            (create with index.searcher() then close it yourself)
-        schema - whoosh schema (index.schema)
-        artist - Artist name
-        title - Song name
-        threshold - Score threshold for a match
-    Output:
-        best_match - best match for the search, or None of no match
+    :usage:
+        >>> index = whoosh_search.get_whoosh_index('/path/to/index/')
+        >>> with index.searcher() as searcher:
+        >>>     whoosh_search.search(searcher, index.schema, 'artist', 'title')
+
+    :parameters:
+        - searcher : whoosh.searching.Searcher
+            Create with index.searcher() then close it yourself
+        - schema : whoosh.fields.Schema
+            E.g. index.schema
+        - artist : str
+            Artist name to search for
+        - title : str
+            Song title to search for
+        - threshold : float
+            A result must have a score higher than this to be a match
+
+    :return:
+        - matches : list of list
+            List of match lists of the form [id, artist, title]
     '''
     arparser = whoosh.qparser.QueryParser('artist', schema)
     tiparser = whoosh.qparser.QueryParser('title', schema)
     q = whoosh.query.And([arparser.parse(unicode(artist, encoding='utf-8')),
                           tiparser.parse(unicode(title, encoding='utf-8'))])
     results = searcher.search(q)
-    result = None
 
     if len(results) > 0:
-        r = results[0]
-        if r.score > threshold:
-            result = [r['track_id'], r['artist'], r['title']]
-
-    return result
+        return [[r['track_id'], r['artist'], r['title']] for r in results if
+                r.score > threshold]
+    else:
+        return None
 
 
 if __name__ == '__main__':
