@@ -35,7 +35,7 @@ def create_index_writer(index_path):
     return index.writer()
 
 
-def get_sv_list(sv_file, delimiter='\t', skiplines=0):
+def get_sv_list(sv_file, delimiter='\t', skiplines=0, field_indices=None):
     '''
     Parses a delimiter-separated value file where each line has the format
 
@@ -48,16 +48,20 @@ def get_sv_list(sv_file, delimiter='\t', skiplines=0):
             Number of lines to skip at the beginning of the file
         - delimiter : str
             Delimiter used to separate values
+        - field_indices : list of int
+            Field indices for [id, artist, title], default [0, 1, 2]
 
     :returns:
         - sv_list : list of list
             Each list contains track_id, artist, title
     '''
     sv_list = []
+    if field_indices is None:
+        field_indices = [0, 1, 2]
     with open(sv_file, 'rb') as f:
         for line in f:
             fields = line.split(delimiter)
-            sv_list.append([fields[0], fields[1], fields[2]])
+            sv_list.append([fields[n] for n in field_indices])
     # Remove first line - labels
     sv_list = sv_list[skiplines:]
     for n, line in enumerate(sv_list):
@@ -142,37 +146,49 @@ def search(searcher, schema, artist, title, threshold=20):
 
 if __name__ == '__main__':
     import os
-    if not os.path.exists('whoosh_indices/cal500_index/'):
-        create_index('whoosh_indices/cal500_index/',
+    if not os.path.exists('data/cal500/index/'):
+        create_index('data/cal500/index/',
                      get_sv_list('file_lists/cal500.txt'))
-    if not os.path.exists('whoosh_indices/cal10k_index/'):
-        create_index('whoosh_indices/cal10k_index/',
+    if not os.path.exists('data/cal10k/index/'):
+        create_index('data/cal10k/index/',
                      get_sv_list('file_lists/EchoNestTrackIDs.tab',
                                  skiplines=1))
-    if not os.path.exists('whoosh_indices/msd_index/'):
-        create_index('whoosh_indices/msd_index/',
+    if not os.path.exists('data/msd/index/'):
+        create_index('data/msd/index/',
                      get_sv_list('file_lists/unique_tracks.txt',
-                                 delimiter='<SEP>'))
-    if not os.path.exists('whoosh_indices/clean_midis_index/'):
-        create_index('whoosh_indices/clean_midis_index/',
-                     get_sv_list('file_lists/clean_midis.txt'))
+                                 delimiter='<SEP>',
+                                 field_indices=[0, 2, 3]))
+    if not os.path.exists('data/clean_midi/index'):
+        create_index('data/clean_midi/index',
+                     get_sv_list('file_lists/clean_midi.txt'))
+    if not os.path.exists('data/uspop2002/index'):
+        create_index('data/uspop2002/index',
+                     get_sv_list('file_lists/uspop2002.txt',
+                                 field_indices=[0, 1, 3]))
 
     artist = 'bon jovi'
     title = 'livin on a prayer'
 
-    index = get_whoosh_index('whoosh_indices/cal500_index/')
+    index = get_whoosh_index('data/cal500/index/')
     with index.searcher() as searcher:
         print 'cal500:\t{}'.format(search(searcher, index.schema,
                                           artist, title))
-    index = get_whoosh_index('whoosh_indices/cal10k_index/')
+
+    index = get_whoosh_index('data/cal10k/index/')
     with index.searcher() as searcher:
         print 'cal10k:\t{}'.format(search(searcher, index.schema,
                                           artist, title))
-    index = get_whoosh_index('whoosh_indices/msd_index/')
+
+    index = get_whoosh_index('data/msd/index/')
     with index.searcher() as searcher:
         print 'msd:\t{}'.format(search(searcher, index.schema, artist, title))
 
-    index = get_whoosh_index('whoosh_indices/clean_midis_index/')
+    index = get_whoosh_index('data/uspop2002/index/')
     with index.searcher() as searcher:
-        print 'clean_midis:\t{}'.format(search(searcher, index.schema,
-                                               artist, title))
+        print 'uspop2002:\t{}'.format(search(searcher, index.schema,
+                                             artist, title))
+
+    index = get_whoosh_index('data/clean_midi/index/')
+    with index.searcher() as searcher:
+        print 'clean_midi:\t{}'.format(search(searcher, index.schema,
+                                              artist, title))
