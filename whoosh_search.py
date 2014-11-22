@@ -56,7 +56,7 @@ def get_sv_list(sv_file, delimiter='\t', skiplines=0):
     sv_list = []
     with open(sv_file, 'rb') as f:
         for line in f:
-            fields = line.split('\t')
+            fields = line.split(delimiter)
             sv_list.append([fields[0], fields[1], fields[2]])
     # Remove first line - labels
     sv_list = sv_list[skiplines:]
