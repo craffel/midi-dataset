@@ -35,41 +35,6 @@ def create_index_writer(index_path):
     return index.writer()
 
 
-def get_sv_list(sv_file, delimiter='\t', skiplines=0, field_indices=None):
-    '''
-    Parses a delimiter-separated value file where each line has the format
-
-    track_id (delimiter) artist (delimiter) title (delimiter) ignored ...
-
-    :parameters:
-        - sv_file : str
-            Path to the separated value file
-        - skiplines : int
-            Number of lines to skip at the beginning of the file
-        - delimiter : str
-            Delimiter used to separate values
-        - field_indices : list of int
-            Field indices for [id, artist, title], default [0, 1, 2]
-
-    :returns:
-        - sv_list : list of list
-            Each list contains track_id, artist, title
-    '''
-    sv_list = []
-    if field_indices is None:
-        field_indices = [0, 1, 2]
-    with open(sv_file, 'rb') as f:
-        for line in f:
-            fields = line.split(delimiter)
-            sv_list.append([fields[n] for n in field_indices])
-    # Remove first line - labels
-    sv_list = sv_list[skiplines:]
-    for n, line in enumerate(sv_list):
-        line = [unicode(a.rstrip(), encoding='utf-8') for a in line]
-        sv_list[n] = line
-    return sv_list
-
-
 # Code from Brian McFee
 def create_index(index_path, track_list):
     '''
