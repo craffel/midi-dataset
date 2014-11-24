@@ -10,9 +10,12 @@ if not os.path.exists('data/cal500/index/'):
         read_sv.get_sv_list('file_lists/cal500.txt',
                             field_indices=[0, 1, 2]))
 if not os.path.exists('data/cal10k/index/'):
-    whoosh_search.create_index('data/cal10k/index/',
-        read_sv.get_sv_list('file_lists/EchoNestTrackIDs.tab',
-                            skiplines=1, field_indices=[0, 1, 2]))
+    # cal10k's ID field is non-contiguous.  What a pain!
+    cal10k_list = read_sv.get_sv_list(
+        'file_lists/EchoNestTrackIDs.tab', skiplines=1, field_indices=[1, 2])
+    cal10k_list = [[unicode(n), r[0], r[1]] for n, r in enumerate(cal10k_list)]
+    whoosh_search.create_index('data/cal10k/index/', cal10k_list)
+
 if not os.path.exists('data/msd/index/'):
     whoosh_search.create_index('data/msd/index/',
         read_sv.get_sv_list('file_lists/unique_tracks.txt',
