@@ -1,223 +1,240 @@
-# -*- coding: utf-8 -*-
-# <nbformat>3.0</nbformat>
-
-# <codecell>
-
 import numpy as np
 import scipy.spatial.distance
-import matplotlib.pyplot as plt
 import librosa
 import pretty_midi
-import glob
-import subprocess
 import joblib
 import os
-import sys
-sys.path.append('../')
 import align_midi
 import scipy.io
-import csv
+import sys
+sys.path.append('..')
+import whoosh_search
+import json
 
-# <codecell>
+BASE_DATA_PATH = '../data/'
+MIDI_PATH = 'clean_midi'
+DATASETS = ['uspop2002', 'cal10k', 'cal500']
+OUTPUT_FOLDER = 'clean_midi_aligned'
+FS = 22050
+CQT_HOP = 512
+ONSET_HOP_DIVISOR = 4
 
-# Utility functions for converting between filenames
-def to_cqt_npy(filename):
-    ''' Given some/path/file.mid or .mp3, return some/path/file_cqt.npy '''
-    return os.path.splitext(filename)[0] + '_cqt.npy'
-def to_beats_npy(filename):
-    ''' Given some/path/file.mid or .mp3, return some/path/file_beats.npy '''
-    return os.path.splitext(filename)[0] + '_beats.npy' 
-def to_onset_strength_npy(filename):
-    ''' Given some/path/file.mid or .mp3, return some/path/file_onset_strength.npy '''
-    return os.path.splitext(filename)[0] + '_onset_strength.npy' 
 
-# <codecell>
+def path_to_file(dataset, basename, extension):
+    '''
+    Returns the path to an actual file given the dataset, base file name,
+    and file extension.  Assumes the dataset format of
+    BASE_DATA_PATH/dataset/extension/basename.extension
 
-def align_one_file(mp3_filename, midi_filename, output_midi_filename, output_diagnostics=True):
+    :parameters:
+        - dataset : str
+            Dataset, should be one of 'uspop2002', 'cal10k', 'cal500', etc.
+        - basename : str
+            Base name of the file
+        - extension : str
+            Extension of the file, e.g. mp3, h5, mid, npz, etc.
+
+    :returns:
+        - full_file_path : str
+            Full path to the file in question.
+    '''
+    return os.path.join(BASE_DATA_PATH, dataset, extension,
+                        '{}.{}'.format(basename, extension))
+
+
+def check_subdirectories(filename):
+    '''
+    Checks that the subdirectories up to filename exist; if they don't, create
+    them.
+
+    :parameters:
+        - filename : str
+            Full path to file
+    '''
+    if not os.path.exists(os.path.split(filename)[0]):
+        os.makedirs(os.path.split(filename)[0])
+
+
+def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
+                   midi_features_filename=None, output_midi_filename=None,
+                   output_diagnostics_filename=None):
     '''
     Helper function for aligning a MIDI file to an audio file.
-    
+
     :parameters:
-        - mp3_filename : str
-            Full path to a .mp3 file.
+        - audio_filename : str
+            Full path to an audio file.
         - midi_filename : str
-            Full path to a .mid file.
-        - output_midi_filename : str
-            Full path to where the aligned .mid file should be written.  If None, don't output.
-        - output_diagnostics : bool
-            If True, also output a .pdf of figures, a .mat of the alignment results,
-            and a .mp3 of audio and synthesized aligned audio
+            Full path to a midi file.
+        - audio_features_filename : str or NoneType
+            Full path to pre-computed features for the audio file.
+            If the file doesn't exist, features will be computed and saved.
+            If None, force re-computation of the features and don't save.
+        - midi_features_filename : str
+            Full path to pre-computed features for the midi file.
+            If the file doesn't exist, features will be computed and saved.
+            If None, force re-computation of the features and don't save.
+        - output_midi_filename : str or NoneType
+            Full path to where the aligned .mid file should be written.
+            If None, don't output.
+        - output_diagnostics_filename : str or NoneType
+            Full path to a file to write out diagnostic information (similarity
+            matrix, best path, etc) in a .npz file.  If None, don't output.
     '''
-    # Load in the corresponding midi file in the midi directory, and return if there is a problem loading it
     try:
         m = pretty_midi.PrettyMIDI(midi_filename)
     except:
-        print "Error loading {}".format(midi_filename)
+        print 'Could not parse {}'.format(os.path.split(midi_filename)[1])
         return
-    
-    if os.path.exists(output_midi_filename.replace('.mid', '.mat')):
-        print 'Skipping {}'.format(os.path.split(midi_filename)[1])
-        return
-    
+
     print "Aligning {}".format(os.path.split(midi_filename)[1])
-    
+
     # Cache audio CQT and onset strength
-    if not os.path.exists(to_onset_strength_npy(mp3_filename)) or not os.path.exists(to_cqt_npy(mp3_filename)):        
-        print "Creating CQT and onset strength signal for {}".format(os.path.split(mp3_filename)[1])
-        # Don't need to load in audio multiple times
-        audio, fs = librosa.load(mp3_filename)
+    if audio_features_filename is None or \
+            not os.path.exists(audio_features_filename):
+        print "Creating CQT and onset strength signal for {}".format(
+            os.path.split(audio_filename)[1])
+        audio, fs = librosa.load(audio_filename, sr=FS)
         # Create audio CQT, which is just frame-wise power, and onset strength
-        audio_gram, audio_onset_strength = align_midi.audio_to_cqt_and_onset_strength(audio, fs=fs)
-        # Write out
-        np.save(to_onset_strength_npy(mp3_filename), audio_onset_strength)
-        np.save(to_cqt_npy(mp3_filename), audio_gram)  
+        audio_gram, audio_onset_strength = \
+            align_midi.audio_to_cqt_and_onset_strength(audio, fs=FS)
+        if audio_features_filename is not None:
+            # Write out
+            check_subdirectories(audio_features_filename)
+            np.savez_compressed(audio_features_filename,
+                                onset_strength=audio_onset_strength,
+                                gram=audio_gram)
+    else:
+        # If a feature file was provided and exists, read it in
+        features = np.load(audio_features_filename)
+        audio_gram = features['gram']
+        audio_onset_strength = features['onset_strength']
 
     # Cache MIDI CQT
-    if not os.path.exists(to_cqt_npy(midi_filename)):      
+    if midi_features_filename is None or \
+            not os.path.exists(midi_features_filename):
         print "Creating CQT for {}".format(os.path.split(midi_filename)[1])
         # Generate synthetic MIDI CQT
-        midi_gram = align_midi.midi_to_cqt(m)
+        piano_roll = m.get_piano_roll(fs=FS/float(CQT_HOP))
+        # Extract only the frequency range of the audio CQT
+        midi_gram = piano_roll[36:96] + 1e-10
         # Get beats
         midi_beats, bpm = align_midi.midi_beat_track(m)
         # Beat synchronize and normalize
         midi_gram = align_midi.post_process_cqt(midi_gram, midi_beats)
-        # Write out
-        np.save(to_cqt_npy(midi_filename), midi_gram)
-            
-    # Load in CQTs
-    audio_gram = np.load(to_cqt_npy(mp3_filename))
-    midi_gram = np.load(to_cqt_npy(midi_filename))
-    # and audio onset strength signal
-    audio_onset_strength = np.load(to_onset_strength_npy(mp3_filename))
-    
+        if midi_features_filename is not None:
+            # Write out
+            check_subdirectories(midi_features_filename)
+            np.savez_compressed(midi_features_filename,
+                                gram=midi_gram)
+    else:
+        # If a feature file was provided and exists, read it in
+        features = np.load(midi_features_filename)
+        midi_gram = features['gram']
+
     # Compute beats
     midi_beats, bpm = align_midi.midi_beat_track(m)
-    audio_beats = librosa.beat.beat_track(onset_envelope=audio_onset_strength, hop_length=512/4, bpm=bpm)[1]/4
+    audio_beats = librosa.beat.beat_track(onset_envelope=audio_onset_strength,
+                                          hop_length=CQT_HOP/ONSET_HOP_DIVISOR,
+                                          bpm=bpm)[1]/ONSET_HOP_DIVISOR
     # Beat-align and log/normalize the audio CQT
     audio_gram = align_midi.post_process_cqt(audio_gram, audio_beats)
-    
-    # Plot log-fs grams
-    plt.figure(figsize=(36, 24))
-    ax = plt.subplot2grid((4, 3), (0, 0), colspan=3)
-    plt.title('MIDI Synthesized')
-    librosa.display.specshow(midi_gram,
-                             x_axis='frames',
-                             y_axis='cqt_note',
-                             fmin=librosa.midi_to_hz(36),
-                             fmax=librosa.midi_to_hz(96))
-    ax = plt.subplot2grid((4, 3), (1, 0), colspan=3)
-    plt.title('Audio data')
-    librosa.display.specshow(audio_gram,
-                             x_axis='frames',
-                             y_axis='cqt_note',
-                             fmin=librosa.midi_to_hz(36),
-                             fmax=librosa.midi_to_hz(96))
-    
+
     # Get similarity matrix
-    similarity_matrix = scipy.spatial.distance.cdist(midi_gram.T, audio_gram.T, metric='cosine')
+    similarity_matrix = scipy.spatial.distance.cdist(midi_gram.T, audio_gram.T,
+                                                     metric='cosine')
     # Get best path through matrix
     p, q, score = align_midi.dpmod(similarity_matrix)
-    
-    # Plot distance at each point of the lowst-cost path
-    ax = plt.subplot2grid((4, 3), (2, 0), rowspan=2)
-    plt.plot([similarity_matrix[p_v, q_v] for p_v, q_v in zip(p, q)])
-    plt.title('Distance at each point on lowest-cost path')
-
-    # Plot similarity matrix and best path through it
-    ax = plt.subplot2grid((4, 3), (2, 1), rowspan=2)
-    plt.imshow(similarity_matrix.T,
-               aspect='auto',
-               interpolation='nearest',
-               cmap=plt.cm.gray)
-    tight = plt.axis()
-    plt.plot(p, q, 'r.', ms=.2)
-    plt.axis(tight)
-    plt.title('Similarity matrix and lowest-cost path, cost={}'.format(score))
-    
-    # Adjust MIDI timing
-    m_aligned = align_midi.adjust_midi(m, librosa.frames_to_time(midi_beats)[p], librosa.frames_to_time(audio_beats)[q])
-    
-    # Plot alignment
-    ax = plt.subplot2grid((4, 3), (2, 2), rowspan=2)
-    note_ons = np.array([note.start for instrument in m.instruments for note in instrument.notes])
-    aligned_note_ons = np.array([note.start for instrument in m_aligned.instruments for note in instrument.notes])
-    plt.plot(note_ons, aligned_note_ons - note_ons, '.')
-    plt.xlabel('Original note location (s)')
-    plt.ylabel('Shift (s)')
-    plt.title('Corrected offset')
 
     # Write out the aligned file
     if output_midi_filename is not None:
+        # Adjust MIDI timing
+        m_aligned = align_midi.adjust_midi(
+            m, librosa.frames_to_time(midi_beats)[p],
+            librosa.frames_to_time(audio_beats)[q])
+        check_subdirectories(output_midi_filename)
         m_aligned.write(output_midi_filename)
-    
-    if output_diagnostics:
-        # Save the figures
-        plt.savefig(os.path.splitext(output_midi_filename)[0] + '.pdf')
-        # Load in the audio data (needed for writing out)
-        audio, fs = librosa.load(mp3_filename, sr=None)
-        # Synthesize the aligned midi
-        midi_audio_aligned = m_aligned.fluidsynth(fs=fs)
-        # Trim to the same size as audio
-        if midi_audio_aligned.shape[0] > audio.shape[0]:
-            midi_audio_aligned = midi_audio_aligned[:audio.shape[0]]
-        else:
-            midi_audio_aligned = np.append(midi_audio_aligned, np.zeros(audio.shape[0] - midi_audio_aligned.shape[0]))
-        # Write out to temporary .wav file
-        librosa.output.write_wav(os.path.splitext(output_midi_filename)[0] + '.wav',
-                                 np.vstack([midi_audio_aligned, audio]).T, fs)
-        # Convert to mp3
-        subprocess.check_output(['ffmpeg',
-                         '-i',
-                         os.path.splitext(output_midi_filename)[0] + '.wav',
-                         '-ab',
-                         '128k',
-                         '-y',
-                         os.path.splitext(output_midi_filename)[0] + '.mp3'])
-        # Remove temporary .wav file
-        os.remove(os.path.splitext(output_midi_filename)[0] + '.wav')
-        # Save a .mat of the results
-        scipy.io.savemat(os.path.splitext(output_midi_filename)[0] + '.mat',
-                         {'similarity_matrix': similarity_matrix,
-                          'p': p, 'q': q, 'score': score})
-    # If we aren't outputting a .pdf, show the plot
-    else:
-        plt.show()
-    plt.close()
 
-# <codecell>
+    if output_diagnostics_filename is not None:
+        check_subdirectories(output_diagnostics_filename)
+        np.savez_compressed(
+            output_diagnostics_filename,
+            similarity_matrix=similarity_matrix.astype('float32'),
+            p=p, q=q, score=score, audio_filename=audio_filename,
+            midi_filename=midi_filename,
+            audio_features_filename=audio_features_filename,
+            midi_features_filename=midi_features_filename,
+            output_midi_filename=output_midi_filename,
+            output_diagnostics_filename=output_diagnostics_filename)
 
-# What is the base data directory?
-BASE_PATH = '../data/cal10k'
-# Where should we write out results?
-OUTPUT_FOLDER = 'midi-aligned-additive-dpmod'
-# Where is the "Clean MIDIs" dataset located?
-CLEAN_MIDIS_PATH = '../data/Clean MIDIs'
-# Where's the tab-separated value file which maps files in the base dataset to the clean MIDIs?
-FILE_MAPPING = '../data/Clean MIDIs-path_to_cal10k_path.txt'
 
 # Create the output dir if it doesn't exist
-output_path = os.path.join(BASE_PATH, OUTPUT_FOLDER)
+output_path = os.path.join(BASE_DATA_PATH, OUTPUT_FOLDER)
 if not os.path.exists(output_path):
     os.makedirs(output_path)
-audio_path = os.path.join(BASE_PATH, 'audio')
-# This will be a list of tuples of an mp3 file, a matched midi, and the corresponding output name
-pairs = []
 
-# Read through rows in supplied mapping file
-with open(FILE_MAPPING) as f:
-    reader = csv.reader(f, delimiter='\t')
-    for row in reader:
-        # Extract the MIDI file name and the mp3 it was matched to
-        midi_filename = row[0]
-        mp3_filename = row[1]
-        # Construct an output filename
-        output_filename = "{}_vs_{}".format(mp3_filename.replace('/', '_'),
-                                            midi_filename.replace('/', '_'))
-        pairs.append((os.path.join(audio_path, mp3_filename),
-                      os.path.join(CLEAN_MIDIS_PATH, midi_filename),
-                      os.path.join(output_path, output_filename)))
+for dataset in DATASETS + [MIDI_PATH, OUTPUT_FOLDER]:
+    if not os.path.exists(os.path.join(BASE_DATA_PATH, dataset, 'npz')):
+        os.makedirs(os.path.join(BASE_DATA_PATH, dataset, 'npz'))
+
+# Load in the js filelist for the MIDI dataset used
+midi_js = os.path.join(BASE_DATA_PATH, MIDI_PATH, 'index.js')
+with open(midi_js) as f:
+    midi_list = json.load(f)
+
+# Construct a list of MIDI-audio matches, which will be attempted alignments
+alignment_matches = []
+pairs = []
+for dataset in DATASETS:
+    # Load in the json filelist for this audio dataset
+    with open(os.path.join(BASE_DATA_PATH, dataset, 'index.js')) as f:
+        file_list = json.load(f)
+    # Load the whoosh index for this dataset
+    index_path = os.path.join(BASE_DATA_PATH, dataset, 'index')
+    index = whoosh_search.get_whoosh_index(index_path)
+    with index.searcher() as searcher:
+        for midi_entry in midi_list:
+            # Match each MIDI file entry against this dataset
+            results = whoosh_search.search(searcher, index.schema,
+                                           midi_entry['artist'],
+                                           midi_entry['title'])
+            if results is not None:
+                for result in results:
+                    if int(result[0]) > len(file_list):
+                        print dataset, results
+                    file_basename = file_list[int(result[0])]['path']
+                    output_basename = '{}_{}_{}'.format(dataset, result[0],
+                                                        midi_entry['md5'])
+                    alignment_matches.append({
+                        'dataset': dataset,
+                        'dataset_id': result[0],
+                        'midi_md5': midi_entry['md5'],
+                        'audio_path': file_basename,
+                        'midi_path': midi_entry['path'],
+                        'output_path': output_basename})
+                    audio_filename = path_to_file(
+                        dataset, file_basename, 'mp3')
+                    midi_filename = path_to_file(
+                        MIDI_PATH, midi_entry['path'], 'mid')
+                    audio_features_filename = path_to_file(
+                        dataset, file_basename, 'npz')
+                    midi_features_filename = path_to_file(
+                        MIDI_PATH, midi_entry['path'], 'npz')
+                    output_midi_filename = path_to_file(
+                        OUTPUT_FOLDER, output_basename, 'mid')
+                    output_diagnostics_filename = path_to_file(
+                        OUTPUT_FOLDER, output_basename, 'npz')
+                    pairs.append((audio_filename,
+                                  midi_filename,
+                                  audio_features_filename,
+                                  midi_features_filename,
+                                  output_midi_filename,
+                                  output_diagnostics_filename))
+
+json_out = os.path.join(BASE_DATA_PATH, OUTPUT_FOLDER, 'index.js')
+with open(json_out, 'wb') as f:
+    json.dump(alignment_matches, f, indent=4)
 
 # Run alignment
-joblib.Parallel(n_jobs=6)(joblib.delayed(align_one_file)(mp3_filename, midi_filename, output_filename)
-                                                         for (mp3_filename, midi_filename, output_filename) in pairs)
-
+joblib.Parallel(n_jobs=10)(joblib.delayed(align_one_file)(*args)
+                          for args in pairs)
