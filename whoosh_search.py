@@ -96,10 +96,13 @@ def search(searcher, schema, artist, title, threshold=20):
         - matches : list of list
             List of match lists of the form [id, artist, title]
     '''
+    if type(artist) != unicode:
+        artist = unicode(artist, encoding='utf-8')
+    if type(title) != unicode:
+        title = unicode(title, encoding='utf-8')
     arparser = whoosh.qparser.QueryParser('artist', schema)
     tiparser = whoosh.qparser.QueryParser('title', schema)
-    q = whoosh.query.And([arparser.parse(unicode(artist, encoding='utf-8')),
-                          tiparser.parse(unicode(title, encoding='utf-8'))])
+    q = whoosh.query.And([arparser.parse(artist), tiparser.parse(title)])
     results = searcher.search(q)
 
     if len(results) > 0:
