@@ -115,9 +115,7 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
             not os.path.exists(midi_features_filename):
         print "Creating CQT for {}".format(os.path.split(midi_filename)[1])
         # Generate synthetic MIDI CQT
-        piano_roll = m.get_piano_roll(fs=FS/float(CQT_HOP))
-        # Extract only the frequency range of the audio CQT
-        midi_gram = piano_roll[36:96] + 1e-10
+        midi_gram = align_midi.midi_to_cqt(m)
         # Get beats
         midi_beats, bpm = align_midi.midi_beat_track(m)
         # Beat synchronize and normalize
