@@ -42,3 +42,11 @@ Thumbs.db
 # IPython notebook
 .ipynb_checkpoints
 *.ipynb
+
+### vim ###
+[._]*.s[a-w][a-z]
+[._]s[a-w][a-z]
+*.un~
+Session.vim
+.netrwhist
+*~
