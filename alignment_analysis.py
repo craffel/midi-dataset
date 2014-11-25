@@ -162,7 +162,7 @@ def get_scores(similarity_matrix, p, q, score):
             Percentage of non-diagonal steps taken
     '''
     score_no_penalty = np.mean(similarity_matrix[p, q])
-    percent_non_diagonal = np.diff(p - q).mean()
+    percent_non_diagonal = np.abs(np.diff(p - q)).mean()
     norm = similarity_matrix.mean()
     return (score, score_no_penalty, score/norm, score_no_penalty/norm,
             percent_non_diagonal)
