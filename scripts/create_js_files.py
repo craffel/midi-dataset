@@ -7,7 +7,7 @@ import read_sv
 
 
 data = read_sv.get_sv_list('file_lists/cal500.txt')
-data = [[row[1], row[2], "{}_-_{}".format(row[1], row[2]).replace(' ', '_')]
+data = [[row[1], row[2], "{}-{}".format(row[1], row[2]).replace(' ', '_')]
         for row in data]
 json_utils.create_js(data,
                      ['artist', 'title', 'path'],
