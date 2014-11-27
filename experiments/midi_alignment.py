@@ -55,6 +55,31 @@ def check_subdirectories(filename):
         os.makedirs(os.path.split(filename)[0])
 
 
+def harmonic_log_cqt(audio, fs=FS, hop=CQT_HOP):
+    '''
+    Compute a log-scaled, haromonic component, column-normalized CQT.
+
+    :parameters:
+        - audio : np.ndarray
+            Audio signal
+        - fs : int
+            Sampling rate
+        - hop : int
+            Hop size
+    :returns:
+        - cqt : np.ndarray
+            Harmonic log-scaled normalized CQT
+    '''
+    H, P = librosa.decompose.hpss(librosa.stft(audio))
+    audio_harmonic = librosa.istft(H)
+    # Compute log-frequency spectrogram of original audio
+    audio_gram = np.abs(librosa.cqt(y=audio_harmonic, sr=fs, hop_length=hop,
+                                    fmin=librosa.midi_to_hz(36), n_bins=60))**2
+    log_gram = librosa.logamplitude(audio_gram,
+                                    ref_power=audio_gram.max())
+    return librosa.util.normalize(log_gram, axis=0)
+
+
 def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
                    midi_features_filename=None, output_midi_filename=None,
                    output_diagnostics_filename=None):
@@ -92,34 +117,27 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
     # Cache audio CQT and onset strength
     if audio_features_filename is None or \
             not os.path.exists(audio_features_filename):
-        print "Creating CQT and onset strength signal for {}".format(
+        print "Creating CQT for {}".format(
             os.path.split(audio_filename)[1])
         audio, fs = librosa.load(audio_filename, sr=FS)
-        # Create audio CQT, which is just frame-wise power, and onset strength
-        audio_gram, audio_onset_strength = \
-            align_midi.audio_to_cqt_and_onset_strength(audio, fs=FS)
+        audio_gram = harmonic_log_cqt(audio, fs)
         if audio_features_filename is not None:
             # Write out
             check_subdirectories(audio_features_filename)
             np.savez_compressed(audio_features_filename,
-                                onset_strength=audio_onset_strength,
                                 gram=audio_gram)
     else:
         # If a feature file was provided and exists, read it in
         features = np.load(audio_features_filename)
         audio_gram = features['gram']
-        audio_onset_strength = features['onset_strength']
 
     # Cache MIDI CQT
     if midi_features_filename is None or \
             not os.path.exists(midi_features_filename):
         print "Creating CQT for {}".format(os.path.split(midi_filename)[1])
         # Generate synthetic MIDI CQT
-        midi_gram = align_midi.midi_to_cqt(m)
-        # Get beats
-        midi_beats, bpm = align_midi.midi_beat_track(m)
-        # Beat synchronize and normalize
-        midi_gram = align_midi.post_process_cqt(midi_gram, midi_beats)
+        audio = m.fluidsynth(fs=FS)
+        midi_gram = harmonic_log_cqt(audio, FS)
         if midi_features_filename is not None:
             # Write out
             check_subdirectories(midi_features_filename)
@@ -129,14 +147,6 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
         # If a feature file was provided and exists, read it in
         features = np.load(midi_features_filename)
         midi_gram = features['gram']
-
-    # Compute beats
-    midi_beats, bpm = align_midi.midi_beat_track(m)
-    audio_beats = librosa.beat.beat_track(onset_envelope=audio_onset_strength,
-                                          hop_length=CQT_HOP/ONSET_HOP_DIVISOR,
-                                          bpm=bpm)[1]/ONSET_HOP_DIVISOR
-    # Beat-align and log/normalize the audio CQT
-    audio_gram = align_midi.post_process_cqt(audio_gram, audio_beats)
 
     # Get similarity matrix
     similarity_matrix = scipy.spatial.distance.cdist(midi_gram.T, audio_gram.T,
@@ -148,8 +158,8 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
     if output_midi_filename is not None:
         # Adjust MIDI timing
         m_aligned = align_midi.adjust_midi(
-            m, librosa.frames_to_time(midi_beats)[p],
-            librosa.frames_to_time(audio_beats)[q])
+            m, librosa.frames_to_time(np.arange(midi_gram.shape[1]))[p],
+            librosa.frames_to_time(np.arange(audio_gram.shape[1]))[q])
         check_subdirectories(output_midi_filename)
         m_aligned.write(output_midi_filename)
 
@@ -158,8 +168,7 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
         np.savez_compressed(
             output_diagnostics_filename,
             similarity_matrix=similarity_matrix.astype('float32'),
-            p=p, q=q, score=score, audio_beats=audio_beats,
-            midi_beats=midi_beats, audio_filename=audio_filename,
+            p=p, q=q, score=score, audio_filename=audio_filename,
             midi_filename=midi_filename,
             audio_features_filename=audio_features_filename,
             midi_features_filename=midi_features_filename,
