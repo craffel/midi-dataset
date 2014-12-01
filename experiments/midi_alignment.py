@@ -167,7 +167,6 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
         check_subdirectories(output_diagnostics_filename)
         np.savez_compressed(
             output_diagnostics_filename,
-            similarity_matrix=similarity_matrix.astype('float32'),
             p=p, q=q, score=score, audio_filename=audio_filename,
             midi_filename=midi_filename,
             audio_features_filename=audio_features_filename,
