@@ -114,9 +114,22 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
 
     print "Aligning {}".format(os.path.split(midi_filename)[1])
 
-    # Cache audio CQT and onset strength
+    cache_audio_cqt = False
+
     if audio_features_filename is None or \
             not os.path.exists(audio_features_filename):
+        cache_audio_cqt = True
+    else:
+        # If a feature file was provided and exists, read it in
+        try:
+            features = np.load(audio_features_filename)
+            audio_gram = features['gram']
+        # If there was a problem reading, force re-cration
+        except:
+            cache_audio_cqt = True
+
+    # Cache audio CQT and onset strength
+    if cache_audio_cqt:
         print "Creating CQT for {}".format(
             os.path.split(audio_filename)[1])
         audio, fs = librosa.load(audio_filename, sr=FS)
@@ -126,14 +139,23 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
             check_subdirectories(audio_features_filename)
             np.savez_compressed(audio_features_filename,
                                 gram=audio_gram)
-    else:
-        # If a feature file was provided and exists, read it in
-        features = np.load(audio_features_filename)
-        audio_gram = features['gram']
+
+    cache_midi_cqt = False
 
     # Cache MIDI CQT
     if midi_features_filename is None or \
             not os.path.exists(midi_features_filename):
+        cache_midi_cqt = True
+    else:
+        try:
+            # If a feature file was provided and exists, read it in
+            features = np.load(midi_features_filename)
+            midi_gram = features['gram']
+        # If there was a problem reading, force re-cration
+        except:
+            cache_audio_cqt = True
+
+    if cache_midi_cqt:
         print "Creating CQT for {}".format(os.path.split(midi_filename)[1])
         # Generate synthetic MIDI CQT
         audio = m.fluidsynth(fs=FS)
@@ -143,10 +165,6 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
             check_subdirectories(midi_features_filename)
             np.savez_compressed(midi_features_filename,
                                 gram=midi_gram)
-    else:
-        # If a feature file was provided and exists, read it in
-        features = np.load(midi_features_filename)
-        midi_gram = features['gram']
 
     # Get similarity matrix
     similarity_matrix = scipy.spatial.distance.cdist(midi_gram.T, audio_gram.T,
