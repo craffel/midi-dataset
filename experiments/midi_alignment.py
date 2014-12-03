@@ -188,13 +188,14 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
     if output_diagnostics_filename is not None:
         check_subdirectories(output_diagnostics_filename)
         np.savez_compressed(
-            output_diagnostics_filename,
-            p=p, q=q, score=score, audio_filename=audio_filename,
-            midi_filename=midi_filename,
-            audio_features_filename=audio_features_filename,
-            midi_features_filename=midi_features_filename,
-            output_midi_filename=output_midi_filename,
-            output_diagnostics_filename=output_diagnostics_filename)
+            output_diagnostics_filename, p=p, q=q, score=score,
+            audio_filename=os.path.abspath(audio_filename),
+            midi_filename=os.path.abspath(midi_filename),
+            audio_features_filename=os.path.abspath(audio_features_filename),
+            midi_features_filename=os.path.abspath(midi_features_filename),
+            output_midi_filename=os.path.abspath(output_midi_filename),
+            output_diagnostics_filename=os.path.abspath(
+                output_diagnostics_filename))
 
 
 # Create the output dir if it doesn't exist
