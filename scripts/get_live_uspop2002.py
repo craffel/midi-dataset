@@ -27,8 +27,15 @@ with open('../file_lists/uspop2002.txt') as f:
 with open('../file_lists/uspop2002_liveness.txt', 'wb') as tsv_file:
     for track in uspop_tracks:
         filename = os.path.join(BASE_DATA_PATH, 'uspop2002', 'mp3', track[-1])
-        with open(filename, 'rb') as f:
-            result = en.post('track/upload', track=f, filetype='mp3')
+        success = False
+        while not success:
+            try:
+                with open(filename, 'rb') as f:
+                    result = en.post('track/upload', track=f, filetype='mp3')
+                success = True
+            except Exception as e:
+                print '  ## Bad connection {}'.format(e.message)
+                time.sleep(10)
         try:
             track_id = result['track']['id']
             result = wait_for_analysis(track_id)
