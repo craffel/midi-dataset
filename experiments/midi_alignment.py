@@ -170,7 +170,11 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
     similarity_matrix = scipy.spatial.distance.cdist(midi_gram.T, audio_gram.T,
                                                      metric='cosine')
     # Get best path through matrix
-    p, q, score = align_midi.dpmod(similarity_matrix)
+    p, q, score = align_midi.dpmod(similarity_matrix,
+                                   # These params work better for framewise
+                                   gully=.98, pen=similarity_matrix.mean())
+    # Normalize score by score by mean sim matrix value
+    score /= similarity_matrix.mean()
 
     # Write out the aligned file
     if output_midi_filename is not None:
