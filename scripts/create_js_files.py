@@ -26,7 +26,7 @@ json_utils.create_js(data,
                      ['artist', 'title', 'md5', 'path'],
                      'data/clean_midi/index.js')
 
-data = read_sv.get_sv_list('file_lists/uspop2002.txt')
+data = read_sv.get_sv_list('file_lists/uspop2002_no_live.txt')
 data = [[row[1], row[2], row[3], row[4].replace('.mp3', '')]
         for row in data]
 json_utils.create_js(data,

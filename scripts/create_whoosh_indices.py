@@ -27,7 +27,7 @@ if not os.path.exists('data/clean_midi/index'):
                             field_indices=[0, 1, 2]))
 if not os.path.exists('data/uspop2002/index'):
     whoosh_search.create_index('data/uspop2002/index',
-        read_sv.get_sv_list('file_lists/uspop2002.txt',
+        read_sv.get_sv_list('file_lists/uspop2002_no_live.txt',
                             field_indices=[0, 1, 3]))
 
 artist = 'bon jovi'
