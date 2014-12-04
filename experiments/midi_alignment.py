@@ -213,7 +213,6 @@ with open(midi_js) as f:
     midi_list = json.load(f)
 
 # Construct a list of MIDI-audio matches, which will be attempted alignments
-alignment_matches = []
 pairs = []
 for dataset in DATASETS:
     # Load in the json filelist for this audio dataset
@@ -235,13 +234,6 @@ for dataset in DATASETS:
                     file_basename = file_list[int(result[0])]['path']
                     output_basename = '{}_{}_{}'.format(dataset, result[0],
                                                         midi_entry['md5'])
-                    alignment_matches.append({
-                        'dataset': dataset,
-                        'dataset_id': result[0],
-                        'midi_md5': midi_entry['md5'],
-                        'audio_path': file_basename,
-                        'midi_path': midi_entry['path'],
-                        'output_path': output_basename})
                     audio_filename = path_to_file(
                         dataset, file_basename, 'mp3')
                     midi_filename = path_to_file(
@@ -260,10 +252,6 @@ for dataset in DATASETS:
                                   midi_features_filename,
                                   output_midi_filename,
                                   output_diagnostics_filename))
-
-json_out = os.path.join(BASE_DATA_PATH, OUTPUT_FOLDER, 'index.js')
-with open(json_out, 'wb') as f:
-    json.dump(alignment_matches, f, indent=4)
 
 # Run alignment
 joblib.Parallel(n_jobs=10)(joblib.delayed(align_one_file)(*args)
