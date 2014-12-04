@@ -3,6 +3,7 @@ import sys
 sys.path.append('../')
 import os
 import time
+import numpy as np
 
 ECHONEST_KEY = open('../.echonest_key').read()
 BASE_DATA_PATH = '../data/'
@@ -24,7 +25,13 @@ with open('../file_lists/uspop2002.txt') as f:
     for line in f:
         uspop_tracks.append(line.rstrip().split('\t'))
 
-with open('../file_lists/uspop2002_liveness.txt', 'wb') as tsv_file:
+with open('../file_lists/uspop2002_liveness.txt') as f:
+    for n, line in enumerate(f):
+        track = line.rstrip().split('\t')
+        if np.all([la == lb for la, lb in zip(track, uspop_tracks[0])]):
+            del uspop_tracks[0]
+
+with open('../file_lists/uspop2002_liveness.txt', 'ab') as tsv_file:
     for track in uspop_tracks:
         filename = os.path.join(BASE_DATA_PATH, 'uspop2002', 'mp3', track[-1])
         success = False
