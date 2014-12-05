@@ -109,4 +109,4 @@ def search(searcher, schema, artist, title, threshold=20):
         return [[r['track_id'], r['artist'], r['title']] for r in results if
                 r.score > threshold]
     else:
-        return None
+        return []

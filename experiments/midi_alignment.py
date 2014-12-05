@@ -227,32 +227,29 @@ for dataset in DATASETS:
             results = whoosh_search.search(searcher, index.schema,
                                            midi_entry['artist'],
                                            midi_entry['title'])
-            if results is not None:
-                for result in results:
-                    if int(result[0]) > len(file_list):
-                        print dataset, results
-                    file_basename = file_list[int(result[0])]['path']
-                    output_basename = '{}_{}_{}'.format(dataset, result[0],
-                                                        midi_entry['md5'])
-                    audio_filename = path_to_file(
-                        dataset, file_basename, 'mp3')
-                    midi_filename = path_to_file(
-                        MIDI_PATH, midi_entry['path'], 'mid')
-                    audio_features_filename = path_to_file(
-                        dataset, file_basename, 'npz')
-                    midi_features_filename = path_to_file(
-                        MIDI_PATH, midi_entry['path'], 'npz')
-                    output_midi_filename = path_to_file(
-                        OUTPUT_FOLDER, output_basename, 'mid')
-                    output_diagnostics_filename = path_to_file(
-                        OUTPUT_FOLDER, output_basename, 'npz')
-                    pairs.append((audio_filename,
-                                  midi_filename,
-                                  audio_features_filename,
-                                  midi_features_filename,
-                                  output_midi_filename,
-                                  output_diagnostics_filename))
+            for result in results:
+                if int(result[0]) > len(file_list):
+                    print dataset, results
+                file_basename = file_list[int(result[0])]['path']
+                output_basename = '{}_{}_{}'.format(dataset, result[0],
+                                                    midi_entry['md5'])
+                audio_filename = path_to_file(
+                    dataset, file_basename, 'mp3')
+                midi_filename = path_to_file(
+                    MIDI_PATH, midi_entry['path'], 'mid')
+                audio_features_filename = path_to_file(
+                    dataset, file_basename, 'npz')
+                midi_features_filename = path_to_file(
+                    MIDI_PATH, midi_entry['path'], 'npz')
+                output_midi_filename = path_to_file(
+                    OUTPUT_FOLDER, output_basename, 'mid')
+                output_diagnostics_filename = path_to_file(
+                    OUTPUT_FOLDER, output_basename, 'npz')
+                pairs.append((audio_filename, midi_filename,
+                              audio_features_filename, midi_features_filename,
+                              output_midi_filename,
+                              output_diagnostics_filename))
 
 # Run alignment
 joblib.Parallel(n_jobs=10)(joblib.delayed(align_one_file)(*args)
-                          for args in pairs)
+                           for args in pairs)

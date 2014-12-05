@@ -261,8 +261,8 @@ if __name__ == '__main__':
                 break
             title = split_all_extensions(f)
             artist = os.path.split(root)[1]
-            result = whoosh_search.search(searcher, index.schema, artist, title)
-            if result is not None:
+            results = whoosh_search.search(searcher, index.schema, artist, title)
+            for result in results:
                 match_list += [[os.path.join(artist, f), "{}-{}.mp3".format( result[1].replace(' ', '_'), result[2].replace(' ', '_') )]]
     searcher.close()
     pickle.dump( match_list, open('../data/Clean MIDIs-path_to_cal500_path.pickle', 'w') )
