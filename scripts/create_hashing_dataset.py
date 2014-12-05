@@ -14,7 +14,7 @@ import beat_aligned_feats
 import glob
 
 # A DP score above this means the alignment is bad
-SCORE_THRESHOLD = .05
+SCORE_THRESHOLD = .8
 BASE_DATA_PATH = '../data'
 DATASETS = ['uspop2002', 'cal10k', 'cal500']
 
