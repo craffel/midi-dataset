@@ -55,7 +55,7 @@ for diagnostics_file in glob.glob(os.path.join(aligned_path, 'npz', '*.npz')):
         continue
     # Construct piano roll, aligned to the msd beat times, only notes 36->84
     piano_roll = pm.get_piano_roll(times=beats)[36:84, :]
-    # Write out
+    # Write out transposed matrices
     np.savez_compressed(os.path.join(output_path, 'npz',
                                      os.path.basename(diagnostics_file)),
-                        X=piano_roll, Y=msd_features)
+                        X=piano_roll.T, Y=msd_features.T)
