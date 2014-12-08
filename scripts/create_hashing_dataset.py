@@ -53,8 +53,8 @@ for diagnostics_file in glob.glob(os.path.join(aligned_path, 'npz', '*.npz')):
     msd_features = np.vstack([chroma, timbre, loudness])
     if np.isnan(msd_features).any():
         continue
-    # Construct piano roll, aligned to the msd beat times
-    piano_roll = pm.get_piano_roll(times=beats)
+    # Construct piano roll, aligned to the msd beat times, only notes 36->84
+    piano_roll = pm.get_piano_roll(times=beats)[36:84, :]
     # Write out
     np.savez_compressed(os.path.join(output_path, 'npz',
                                      os.path.basename(diagnostics_file)),
