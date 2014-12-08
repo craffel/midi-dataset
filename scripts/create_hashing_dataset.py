@@ -38,17 +38,17 @@ for diagnostics_file in glob.glob(os.path.join(aligned_path, 'npz', '*.npz')):
         # Some files have no EN analysis
         if beats.size == 0:
             continue
+        # Load in pretty midi object
+        pm = pretty_midi.PrettyMIDI(str(diagnostics['midi_filename']))
+        start_time = min([n.start for i in pm.instruments for n in i.notes])
+        end_time = min(pm.get_end_time(), beats.max())
+        # Get indices which fall within the range of correct alignment
+        time_mask = np.logical_and(beats >= start_time, beats <= end_time)
+        beats = beats[time_mask]
         # and beat-synchronous feature matrices
-        chroma = beat_aligned_feats.get_btchromas(h5)
-        timbre = beat_aligned_feats.get_bttimbre(h5)
-        loudness = beat_aligned_feats.get_btloudnessmax(h5)
-    # Load in pretty midi object
-    pm = pretty_midi.PrettyMIDI(str(diagnostics['midi_filename']))
-    start_time = min([n.start for i in pm.instruments for n in i.notes])
-    end_time = min(pm.get_end_time(), beats.max())
-    # Get indices which fall within the range of correct alignment
-    time_mask = np.logical_and(beats >= start_time, beats <= end_time)
-    beats = beats[time_mask]
+        chroma = beat_aligned_feats.get_btchromas(h5)[:, time_mask]
+        timbre = beat_aligned_feats.get_bttimbre(h5)[:, time_mask]
+        loudness = beat_aligned_feats.get_btloudnessmax(h5)[:, time_mask]
     # Stack it
     msd_features = np.vstack([chroma, timbre, loudness])
     if np.isnan(msd_features).any():
