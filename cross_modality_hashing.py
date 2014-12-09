@@ -140,16 +140,18 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
     Y_n_output = layers_Y[-1].get_output(Y_n_input)
 
     # Compute \sum max(0, m - ||a - b||_2)^2
-    hinge_cost = lambda m, a, b: T.sum(T.maximum(
-        0, m - T.sqrt(T.sum((a - b)**2, axis=1)))**2)
+    def hinge_cost(m, a, b):
+        dist = m - T.sqrt(T.sum((a - b)**2, axis=1))
+        return T.sum((dist*(dist > 0))**2)
+
     # Unthresholded, unscaled cost of positive examples across modalities
     cost_p = T.sum((X_p_output - Y_p_output)**2)
     # Thresholded, scaled cost of cross-modality negative examples
-    cost_n = alpha_XY*hinge_cost(m_XY, X_n_output, Y_n_output)
+    cost_n = alpha_XY*hinge_cost(m_XY_val, X_n_output, Y_n_output)
     # Thresholded, scaled cost of x-modality negative examples
-    cost_x = alpha_X*hinge_cost(m_X, X_p_output, X_n_output)
+    cost_x = alpha_X*hinge_cost(m_X_val, X_p_output, X_n_output)
     # Thresholded, scaled cost of y-modality negative examples
-    cost_y = alpha_Y*hinge_cost(m_Y, Y_p_output, Y_n_output)
+    cost_y = alpha_Y*hinge_cost(m_Y_val, Y_p_output, Y_n_output)
     # Return sum of these costs
     hasher_cost = cost_p + cost_n + cost_x + cost_y
 
@@ -160,11 +162,12 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
                                                 learning_rate, momentum)
     train = theano.function(
         [X_p_input, X_n_input, Y_p_input, Y_n_input, alpha_XY, m_XY, alpha_X,
-         m_X, alpha_Y, m_Y], hasher_cost, updates=updates)
+         m_X, alpha_Y, m_Y], hasher_cost, updates=updates,
+        on_unused_input='ignore')
     # Compute cost without trianing
     cost = theano.function(
         [X_p_input, X_n_input, Y_p_input, Y_n_input, alpha_XY, m_XY, alpha_X,
-         m_X, alpha_Y, m_Y], hasher_cost)
+         m_X, alpha_Y, m_Y], hasher_cost, on_unused_input='ignore')
 
     # Keep track of the patience - we will always increase the patience once
     patience = initial_patience/patience_increase
