@@ -24,7 +24,7 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
                                 hidden_layer_sizes_X, hidden_layer_sizes_Y,
                                 alpha_XY_val, m_XY_val, alpha_X_val, m_X_val,
                                 alpha_Y_val, m_Y_val, n_bits,
-                                learning_rate=1e-4, momentum=.9,
+                                learning_rate=1e-5, momentum=.9,
                                 batch_size=10, epoch_size=1000,
                                 initial_patience=10000,
                                 improvement_threshold=0.99,
@@ -134,21 +134,22 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
         layers_Y[-1], num_units=n_bits,
         nonlinearity=nntools.nonlinearities.tanh))
 
+    X_p_output = layers_X[-1].get_output(X_p_input)
+    X_n_output = layers_X[-1].get_output(X_n_input)
+    Y_p_output = layers_Y[-1].get_output(Y_p_input)
+    Y_n_output = layers_Y[-1].get_output(Y_n_input)
+
+    # Compute \sum max(0, m - ||a - b||_2)^2
+    hinge_cost = lambda m, a, b: T.sum(T.maximum(
+        0, m - T.sqrt(T.sum((a - b)**2, axis=1)))**2)
     # Unthresholded, unscaled cost of positive examples across modalities
-    cost_p = T.sum((layers_X[-1].get_output(X_p_input)
-                    - layers_Y[-1].get_output(Y_p_input))**2)
+    cost_p = T.sum((X_p_output - Y_p_output)**2)
     # Thresholded, scaled cost of cross-modality negative examples
-    cost_n = alpha_XY*T.sum(T.maximum(
-        0, 4*m_XY - T.sum((layers_X[-1].get_output(X_n_input)
-                           - layers_Y[-1].get_output(Y_n_input))**2, axis=1)))
+    cost_n = alpha_XY*hinge_cost(m_XY, X_n_output, Y_n_output)
     # Thresholded, scaled cost of x-modality negative examples
-    cost_x = alpha_X*T.sum(T.maximum(
-        0, 4*m_X - T.sum((layers_X[-1].get_output(X_p_input)
-                          - layers_X[-1].get_output(X_n_input))**2, axis=1)))
+    cost_x = alpha_X*hinge_cost(m_X, X_p_output, X_n_output)
     # Thresholded, scaled cost of y-modality negative examples
-    cost_y = alpha_Y*T.sum(T.maximum(
-        0, 4*m_Y - T.sum((layers_Y[-1].get_output(Y_p_input)
-                          - layers_Y[-1].get_output(Y_n_input))**2, axis=1)))
+    cost_y = alpha_Y*hinge_cost(m_Y, Y_p_output, Y_n_output)
     # Return sum of these costs
     hasher_cost = cost_p + cost_n + cost_x + cost_y
 

@@ -72,7 +72,7 @@ def parameter_space_test():
     hp_values['n_layers'] = 3
     # Total alpha should be between 3 and 6
     hp_values['alpha_XY'] = 1
-    hp_values['m_XY'] = 8
+    hp_values['m_XY'] = 3
     hp_values['alpha_X'] = np.array(.1).astype(theano.config.floatX)
     hp_values['m_X'] = 0
     hp_values['alpha_Y'] = np.array(.1).astype(theano.config.floatX)
