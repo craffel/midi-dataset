@@ -118,12 +118,12 @@ while True:
     print "##################"
     trial_directory = os.path.join(result_directory, parameter_string)
     # In the very odd case that we have already tried this parameter setting
-    if os.path.exists(trial_directory):
-        continue
-    os.makedirs(trial_directory)
+    # if os.path.exists(trial_directory):
+    #     continue
+    # os.makedirs(trial_directory)
     # Save the hyperparameter dict
-    with open(os.path.join(trial_directory, 'hyperparameters.pkl'), 'wb') as f:
-        pickle.dump(hp, f)
+    # with open(os.path.join(trial_directory, 'hyperparameters.pkl'), 'wb') as f:
+    #     pickle.dump(hp, f)
 
     epochs, parameters = cross_modality_hashing.train_cross_modality_hasher(
         X_train, Y_train, X_validate, Y_validate,
@@ -132,7 +132,7 @@ while True:
         hp['alpha_X'], hp['m_X'], hp['alpha_Y'], hp['m_Y'], hp['n_bits'],
         mrr_samples=mrr_samples)
 
-    with open(os.path.join(trial_directory, 'epochs.pkl'), 'wb') as f:
-        pickle.dump(epochs, f)
-    with open(os.path.join(trial_directory, 'parameters.pkl'), 'wb') as f:
-        pickle.dump(parameters, f)
+    # with open(os.path.join(trial_directory, 'epochs.pkl'), 'wb') as f:
+    #     pickle.dump(epochs, f)
+    # with open(os.path.join(trial_directory, 'parameters.pkl'), 'wb') as f:
+    #     pickle.dump(parameters, f)

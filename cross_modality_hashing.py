@@ -22,9 +22,8 @@ import collections
 
 def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
                                 hidden_layer_sizes_X, hidden_layer_sizes_Y,
-                                alpha_XY_val, m_XY_val, alpha_X_val, m_X_val,
-                                alpha_Y_val, m_Y_val, n_bits,
-                                learning_rate=1e-5, momentum=.9,
+                                alpha_XY, m_XY, alpha_X, m_X, alpha_Y, m_Y,
+                                n_bits, learning_rate=1e-5, momentum=.9,
                                 batch_size=10, epoch_size=1000,
                                 initial_patience=10000,
                                 improvement_threshold=0.99,
@@ -49,17 +48,17 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
         - hidden_layer_sizes_Y : list-like
             Size of each hidden layer in Y network.
             Number of layers = len(hidden_layer_sizes_Y) + 1
-        - alpha_XY_val : float
+        - alpha_XY : float
             Scaling parameter for cross-modality negative example cost
-        - m_XY_val : int
+        - m_XY : int
             Cross-modality negative example threshold
-        - alpha_X_val : float
+        - alpha_X : float
             Scaling parameter for X-modality negative example cost
-        - m_X_val : int
+        - m_X : int
             Y-modality negative example threshold
-        - alpha_Y_val : float
+        - alpha_Y : float
             Scaling parameter for Y-modality negative example cost
-        - m_Y_val : int
+        - m_Y : int
             Y-modality negative example threshold
         - n_bits : int
             Number of bits in the output representation
@@ -98,13 +97,6 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
     Y_p_input = T.matrix('Y_p_input')
     Y_n_input = T.matrix('Y_n_input')
     Y_input = T.matrix('Y_input')
-    # Symbolic hyperparameters
-    alpha_XY = T.scalar('alpha_XY')
-    m_XY = T.scalar('m_XY')
-    alpha_X = T.scalar('alpha_X')
-    m_X = T.scalar('m_X')
-    alpha_Y = T.scalar('alpha_Y')
-    m_Y = T.scalar('m_Y')
 
     # X-modality hashing network
     layers_X = []
@@ -147,11 +139,11 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
     # Unthresholded, unscaled cost of positive examples across modalities
     cost_p = T.sum((X_p_output - Y_p_output)**2)
     # Thresholded, scaled cost of cross-modality negative examples
-    cost_n = alpha_XY*hinge_cost(m_XY_val, X_n_output, Y_n_output)
+    cost_n = alpha_XY*hinge_cost(m_XY, X_n_output, Y_n_output)
     # Thresholded, scaled cost of x-modality negative examples
-    cost_x = alpha_X*hinge_cost(m_X_val, X_p_output, X_n_output)
+    cost_x = alpha_X*hinge_cost(m_X, X_p_output, X_n_output)
     # Thresholded, scaled cost of y-modality negative examples
-    cost_y = alpha_Y*hinge_cost(m_Y_val, Y_p_output, Y_n_output)
+    cost_y = alpha_Y*hinge_cost(m_Y, Y_p_output, Y_n_output)
     # Return sum of these costs
     hasher_cost = cost_p + cost_n + cost_x + cost_y
 
@@ -161,13 +153,11 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
     updates = nntools.updates.nesterov_momentum(hasher_cost, params,
                                                 learning_rate, momentum)
     train = theano.function(
-        [X_p_input, X_n_input, Y_p_input, Y_n_input, alpha_XY, m_XY, alpha_X,
-         m_X, alpha_Y, m_Y], hasher_cost, updates=updates,
-        on_unused_input='ignore')
+        [X_p_input, X_n_input, Y_p_input, Y_n_input], hasher_cost,
+        updates=updates)
     # Compute cost without trianing
     cost = theano.function(
-        [X_p_input, X_n_input, Y_p_input, Y_n_input, alpha_XY, m_XY, alpha_X,
-         m_X, alpha_Y, m_Y], hasher_cost, on_unused_input='ignore')
+        [X_p_input, X_n_input, Y_p_input, Y_n_input], hasher_cost)
 
     # Keep track of the patience - we will always increase the patience once
     patience = initial_patience/patience_increase
@@ -188,8 +178,7 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
     data_iterator = hashing_utils.get_next_batch(X_train, Y_train, batch_size,
                                                  max_iter)
     for n, (X_p, Y_p, X_n, Y_n) in enumerate(data_iterator):
-        train_cost = train(X_p, X_n, Y_p, Y_n, alpha_XY_val, m_XY_val,
-                           alpha_X_val, m_X_val, alpha_Y_val, m_Y_val)
+        train_cost = train(X_p, X_n, Y_p, Y_n)
         # Validate the net after each epoch
         if n and (not n % epoch_size):
             epoch_result = collections.OrderedDict()
@@ -198,9 +187,7 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
             epoch_result['train_cost'] = train_cost
             # Also compute validate cost (more stable)
             epoch_result['validate_cost'] = cost(
-                X_validate, X_validate_n, Y_validate, Y_validate_n,
-                alpha_XY_val, m_XY_val, alpha_X_val, m_X_val, alpha_Y_val,
-                m_Y_val)
+                X_validate, X_validate_n, Y_validate, Y_validate_n)
 
             # Compute statistics on validation set only
             X_val_output = X_output.eval({X_input: X_validate})
