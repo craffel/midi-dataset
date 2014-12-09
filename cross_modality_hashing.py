@@ -23,8 +23,8 @@ import collections
 def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
                                 hidden_layer_sizes_X, hidden_layer_sizes_Y,
                                 alpha_XY, m_XY, alpha_X, m_X, alpha_Y, m_Y,
-                                n_bits, learning_rate=1e-5, momentum=.9,
-                                batch_size=10, epoch_size=1000,
+                                n_bits, dropout=True, learning_rate=1e-5,
+                                momentum=.9, batch_size=10, epoch_size=1000,
                                 initial_patience=10000,
                                 improvement_threshold=0.99,
                                 patience_increase=1.2, max_iter=200000,
@@ -62,6 +62,8 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
             Y-modality negative example threshold
         - n_bits : int
             Number of bits in the output representation
+        - dropout : bool
+            Whether to use dropout
         - learning_rate : float
             SGD learning rate
         - momemntum : float
@@ -78,7 +80,7 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
             Amount to increase patience when validation cost has decreased
         - max_iter : int
             Maximum number of batches to train on, default 200000
-        - diagnostics_samples : int
+        - mrr_samples : int
             Indices of samples in the validation set over which to compute mean
             reciprocal rank.  None means use entire validation set.
 
@@ -108,6 +110,8 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
         layers_X.append(nntools.layers.DenseLayer(
             layers_X[-1], num_units=num_units,
             nonlinearity=nntools.nonlinearities.tanh))
+        if dropout:
+            layers_X.append(nntools.layers.DropoutLayer(layers_X[-1]))
     # Add output layer
     layers_X.append(nntools.layers.DenseLayer(
         layers_X[-1], num_units=n_bits,
@@ -122,50 +126,57 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
         layers_Y.append(nntools.layers.DenseLayer(
             layers_Y[-1], num_units=num_units,
             nonlinearity=nntools.nonlinearities.tanh))
+        if dropout:
+            layers_Y.append(nntools.layers.DropoutLayer(layers_Y[-1]))
     layers_Y.append(nntools.layers.DenseLayer(
         layers_Y[-1], num_units=n_bits,
         nonlinearity=nntools.nonlinearities.tanh))
-
-    X_p_output = layers_X[-1].get_output(X_p_input)
-    X_n_output = layers_X[-1].get_output(X_n_input)
-    Y_p_output = layers_Y[-1].get_output(Y_p_input)
-    Y_n_output = layers_Y[-1].get_output(Y_n_input)
 
     # Compute \sum max(0, m - ||a - b||_2)^2
     def hinge_cost(m, a, b):
         dist = m - T.sqrt(T.sum((a - b)**2, axis=1))
         return T.sum((dist*(dist > 0))**2)
 
-    # Unthresholded, unscaled cost of positive examples across modalities
-    cost_p = T.sum((X_p_output - Y_p_output)**2)
-    # Thresholded, scaled cost of cross-modality negative examples
-    cost_n = alpha_XY*hinge_cost(m_XY, X_n_output, Y_n_output)
-    # Thresholded, scaled cost of x-modality negative examples
-    cost_x = alpha_X*hinge_cost(m_X, X_p_output, X_n_output)
-    # Thresholded, scaled cost of y-modality negative examples
-    cost_y = alpha_Y*hinge_cost(m_Y, Y_p_output, Y_n_output)
-    # Return sum of these costs
-    hasher_cost = cost_p + cost_n + cost_x + cost_y
+    def hasher_cost(deterministic):
+        X_p_output = layers_X[-1].get_output(X_p_input,
+                                             deterministic=deterministic)
+        X_n_output = layers_X[-1].get_output(X_n_input,
+                                             deterministic=deterministic)
+        Y_p_output = layers_Y[-1].get_output(Y_p_input,
+                                             deterministic=deterministic)
+        Y_n_output = layers_Y[-1].get_output(Y_n_input,
+                                             deterministic=deterministic)
+
+        # Unthresholded, unscaled cost of positive examples across modalities
+        cost_p = T.sum((X_p_output - Y_p_output)**2)
+        # Thresholded, scaled cost of cross-modality negative examples
+        cost_n = alpha_XY*hinge_cost(m_XY, X_n_output, Y_n_output)
+        # Thresholded, scaled cost of x-modality negative examples
+        cost_x = alpha_X*hinge_cost(m_X, X_p_output, X_n_output)
+        # Thresholded, scaled cost of y-modality negative examples
+        cost_y = alpha_Y*hinge_cost(m_Y, Y_p_output, Y_n_output)
+        # Return sum of these costs
+        return cost_p + cost_n + cost_x + cost_y
 
     # Function for optimizing the neural net parameters, by minimizing cost
     params = (nntools.layers.get_all_params(layers_X[-1])
               + nntools.layers.get_all_params(layers_Y[-1]))
-    updates = nntools.updates.nesterov_momentum(hasher_cost, params,
+    updates = nntools.updates.nesterov_momentum(hasher_cost(False), params,
                                                 learning_rate, momentum)
     train = theano.function(
-        [X_p_input, X_n_input, Y_p_input, Y_n_input], hasher_cost,
+        [X_p_input, X_n_input, Y_p_input, Y_n_input], hasher_cost(False),
         updates=updates)
     # Compute cost without trianing
     cost = theano.function(
-        [X_p_input, X_n_input, Y_p_input, Y_n_input], hasher_cost)
+        [X_p_input, X_n_input, Y_p_input, Y_n_input], hasher_cost(True))
 
     # Keep track of the patience - we will always increase the patience once
     patience = initial_patience/patience_increase
     current_validate_cost = np.inf
 
     # Functions for computing the neural net output on the train and val sets
-    X_output = layers_X[-1].get_output(X_input)
-    Y_output = layers_Y[-1].get_output(Y_input)
+    X_output = layers_X[-1].get_output(X_input, deterministic=True)
+    Y_output = layers_Y[-1].get_output(Y_input, deterministic=True)
 
     # A list of epoch result dicts, one per epoch
     epochs = []
