@@ -77,8 +77,8 @@ best = hyperopt.fmin(objective, space=space, algo=hyperopt.tpe.suggest,
                      max_evals=1000, trials=trials)
 
 with open('trials.pkl', 'wb') as f:
-    pickle.dump(trials.trials)
+    pickle.dump(trials.trials, f)
 with open('results.pkl', 'wb') as f:
-    pickle.dump(trials.results)
+    pickle.dump(trials.results, f)
 with open('best.pkl', 'wb') as f:
-    pickle.dump(best)
+    pickle.dump(best, f)
