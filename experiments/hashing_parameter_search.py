@@ -48,7 +48,7 @@ def objective(params):
     print 'n_layers: {}'.format(n_layers),
     print 'learning_rate: {}'.format(learning_rate)
     success = np.all([np.isfinite(e['validate_cost']) for e in epochs])
-    if not success:
+    if len(epochs) == 0 or not success:
         print '    Failed to converge.'
         print
         return {'loss': 0, 'status': hyperopt.STATUS_FAIL, 'epochs': epochs}
