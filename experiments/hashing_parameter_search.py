@@ -67,7 +67,7 @@ space = {'n_layers': 3,  # hyperopt.hp.quniform('n_layers', 3, 4, 1),
          'm_XY': hyperopt.hp.randint('m_XY', 17),
          'm_X': hyperopt.hp.randint('m_X', 17),
          'm_Y': hyperopt.hp.randint('m_Y', 17),
-         'dropout': hyperopt.hp.randint('dropout', 2),
+         'dropout': False,
          'learning_rate_exp': hyperopt.hp.quniform('learning_rate_exp',
                                                    2.5, 8.5, 1),
          'momentum': hyperopt.hp.uniform('momentum', 0, 1)}
