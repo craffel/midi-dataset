@@ -26,8 +26,8 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
                                 n_bits, dropout=True, learning_rate=1e-5,
                                 momentum=.9, batch_size=100, epoch_size=1000,
                                 initial_patience=10000,
-                                improvement_threshold=0.99,
-                                patience_increase=1.2, max_iter=200000,
+                                improvement_threshold=0.995,
+                                patience_increase=1.1, max_iter=200000,
                                 mrr_samples=None):
     ''' Utility function for training a siamese net for cross-modality hashing
     So many parameters.
@@ -180,8 +180,6 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
 
     # A list of epoch result dicts, one per epoch
     epochs = []
-    # A list of parameter settings at each epoch
-    parameters = []
 
     # Create fixed negative example validation set
     X_validate_n = X_validate[np.random.permutation(X_validate.shape[0])]
@@ -226,11 +224,6 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
                 patience_cost = improvement_threshold*current_validate_cost
                 if epoch_result['validate_cost'] < patience_cost:
                     patience *= patience_increase
-                    print (" ... increasing patience to {} because "
-                           "{} < {}*{}".format(patience,
-                                               epoch_result['validate_cost'],
-                                               improvement_threshold,
-                                               current_validate_cost))
                 current_validate_cost = epoch_result['validate_cost']
             # Only compute MRR on validate
             mrr_pessimist, mrr_optimist = hashing_utils.mean_reciprocal_rank(
@@ -241,25 +234,11 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
             # Store scores and statistics for this epoch
             epochs.append(epoch_result)
 
-            # Get current parameter settings
-            current_parameters = collections.OrderedDict()
-            for net_name, layers in zip(['X_net', 'Y_net'],
-                                     [layers_X, layers_Y]):
-                for n, layer in enumerate(layers):
-                    for param in layer.get_params():
-                        current_parameters["{}_layer_{}_{}".format(
-                            net_name, n, param.name)] = param.get_value()
-            # Store parameters for this epoch
-            parameters.append(current_parameters)
-
-            print '    patience : {}'.format(patience)
-            print '    current_validation_cost : {}'.format(
-                current_validate_cost)
-            for k, v in epoch_result.items():
-                print '    {} : {}'.format(k, round(v, 3))
-            print
+            # Stop training if cost is inf/nan
+            if not np.isfinite(epoch_result['validate_cost']):
+                break
 
         if n > patience:
             break
 
-    return epochs, parameters
+    return epochs

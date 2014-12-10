@@ -3,93 +3,15 @@ sys.path.append('../')
 import cross_modality_hashing
 import hashing_utils
 import numpy as np
-import theano
 import os
+import hyperopt
 import pickle
-import collections
 
-
-def parameter_space_1():
-    ''' Randomly sample the first parameter search space '''
-    hp_values = collections.OrderedDict()
-    hp_values['n_bits'] = np.random.choice([8, 12, 16])
-    hp_values['n_layers'] = np.random.choice([3, 4])
-    hp_values['alpha_XY'] = np.random.choice(
-        np.array(np.linspace(0, 2, 201), dtype=theano.config.floatX))
-    hp_values['m_XY'] = np.random.choice(17)
-    hp_values['alpha_X'] = np.random.choice(
-        np.array(np.linspace(0, 2, 201), dtype=theano.config.floatX))
-    hp_values['m_X'] = np.random.choice(17)
-    hp_values['alpha_Y'] = np.random.choice(
-        np.array(np.linspace(0, 2, 201), dtype=theano.config.floatX))
-    hp_values['m_Y'] = np.random.choice(17)
-    return hp_values
-
-
-def parameter_space_2():
-    # Possible values for each hyperparameter to take
-    hp_values = collections.OrderedDict()
-    hp_values['n_bits'] = np.random.choice([16, 24])
-    hp_values['n_layers'] = 3
-    hp_values['alpha_XY'] = np.random.choice(
-        np.array(np.linspace(0, 2, 201), dtype=theano.config.floatX))
-    hp_values['m_XY'] = np.random.choice(17)
-    hp_values['alpha_X'] = np.random.choice(
-        np.array(np.linspace(0, 2, 201), dtype=theano.config.floatX))
-    hp_values['m_X'] = np.random.choice(17)
-    hp_values['alpha_Y'] = np.random.choice(
-        np.array(np.linspace(0, 2, 201), dtype=theano.config.floatX))
-    hp_values['m_Y'] = np.random.choice(17)
-    return hp_values
-
-
-def parameter_space_3():
-    hp_values = collections.OrderedDict()
-    # 24 bits works better than 16
-    hp_values['n_bits'] = 24
-    hp_values['n_layers'] = 3
-    # Total alpha should be between 3 and 6
-    total_alpha = 3*np.random.random_sample() + 3
-    # Compute random proportion of each alpha
-    alpha_proportions = np.random.random_sample(3)
-    alpha_proportions /= alpha_proportions.sum()
-    hp_values['alpha_XY'] = np.array(
-        [total_alpha*alpha_proportions[0]], dtype=theano.config.floatX)[0]
-    hp_values['m_XY'] = np.random.choice(10)
-    hp_values['alpha_X'] = np.array(
-        [total_alpha*alpha_proportions[1]], dtype=theano.config.floatX)[0]
-    hp_values['m_X'] = np.random.choice(10)
-    hp_values['alpha_Y'] = np.array(
-        [total_alpha*alpha_proportions[2]], dtype=theano.config.floatX)[0]
-    hp_values['m_Y'] = np.random.choice(10)
-    return hp_values
-
-
-def parameter_space_test():
-    hp_values = collections.OrderedDict()
-    # 24 bits works better than 16
-    hp_values['n_bits'] = 16
-    hp_values['n_layers'] = 3
-    # Total alpha should be between 3 and 6
-    hp_values['alpha_XY'] = np.array(1.).astype(theano.config.floatX)
-    hp_values['m_XY'] = np.array(3.).astype(theano.config.floatX)
-    hp_values['alpha_X'] = np.array(.1).astype(theano.config.floatX)
-    hp_values['m_X'] = np.array(0.).astype(theano.config.floatX)
-    hp_values['alpha_Y'] = np.array(.1).astype(theano.config.floatX)
-    hp_values['m_Y'] = np.array(0.).astype(theano.config.floatX)
-    return hp_values
-
-
-# <codecell>
 
 # Set up paths
 base_data_directory = '../data'
-result_directory = os.path.join(base_data_directory, 'parameter_search')
 training_data_directory = os.path.join(base_data_directory, 'hash_dataset',
                                        'npz')
-if not os.path.exists(result_directory):
-    os.makedirs(result_directory)
-
 # Load in the data
 X, Y = hashing_utils.load_data(training_data_directory)
 # Split into train and validate and standardize
@@ -105,34 +27,58 @@ mrr_samples = np.random.choice(X_validate.shape[0], n_mrr_samples, False)
 hidden_layer_size_X = int(2**np.ceil(np.log2(X_train.shape[1])))
 hidden_layer_size_Y = int(2**np.ceil(np.log2(Y_train.shape[1])))
 
-while True:
-    # Randomly choose a value for each hyperparameter
-    hp = parameter_space_test()
-    # Make a subdirectory for this parameter setting
-    parameter_string = ','.join(["{}={}".format(k, round(v, 2))
-                                 for (k, v) in hp.items()])
-    print
-    print
-    print "##################"
-    print parameter_string
-    print "##################"
-    trial_directory = os.path.join(result_directory, parameter_string)
-    # In the very odd case that we have already tried this parameter setting
-    # if os.path.exists(trial_directory):
-    #     continue
-    # os.makedirs(trial_directory)
-    # Save the hyperparameter dict
-    # with open(os.path.join(trial_directory, 'hyperparameters.pkl'), 'wb') as f:
-    #     pickle.dump(hp, f)
 
-    epochs, parameters = cross_modality_hashing.train_cross_modality_hasher(
+def objective(params):
+    '''
+    Wrapper around cross-modality hashing for hyperopt
+    '''
+    n_layers = int(params['n_layers'])
+    learning_rate = 10**(-params['learning_rate_exp'])
+    params = dict([(k, v) for k, v in params.items()
+                   if k != 'n_layers' and k != 'learning_rate_exp'])
+
+    epochs = cross_modality_hashing.train_cross_modality_hasher(
         X_train, Y_train, X_validate, Y_validate,
-        [hidden_layer_size_X]*(hp['n_layers'] - 1),
-        [hidden_layer_size_Y]*(hp['n_layers'] - 1), hp['alpha_XY'], hp['m_XY'],
-        hp['alpha_X'], hp['m_X'], hp['alpha_Y'], hp['m_Y'], hp['n_bits'],
-        mrr_samples=mrr_samples)
+        [hidden_layer_size_X]*(n_layers - 1),
+        [hidden_layer_size_Y]*(n_layers - 1),
+        mrr_samples=mrr_samples, n_bits=16, learning_rate=learning_rate,
+        **params)
+    for k, v in params.items():
+        print '{} : {}'.format(k, v),
+    print 'n_layers: {}'.format(n_layers),
+    print 'learning_rate: {}'.format(learning_rate)
+    success = np.all([np.isfinite(e['validate_cost']) for e in epochs])
+    if not success:
+        print '    Failed to converge.'
+        print
+        return {'loss': 0, 'status': hyperopt.STATUS_FAIL, 'epochs': epochs}
+    else:
+        best_mrr = np.max([e['validate_mrr_pessimist'] for e in epochs])
+        print '   Best MRR {} in {} epochs'.format(best_mrr, len(epochs))
+        print
+        return {'loss': -best_mrr,
+                'status': hyperopt.STATUS_OK,
+                'epochs': epochs}
 
-    # with open(os.path.join(trial_directory, 'epochs.pkl'), 'wb') as f:
-    #     pickle.dump(epochs, f)
-    # with open(os.path.join(trial_directory, 'parameters.pkl'), 'wb') as f:
-    #     pickle.dump(parameters, f)
+space = {'n_layers': 3,  # hyperopt.hp.quniform('n_layers', 3, 4, 1),
+         'alpha_XY': hyperopt.hp.lognormal('alpha_XY', 0, 1),
+         'alpha_X': hyperopt.hp.lognormal('alpha_X', 0, 1),
+         'alpha_Y': hyperopt.hp.lognormal('alpha_Y', 0, 1),
+         'm_XY': hyperopt.hp.randint('m_XY', 17),
+         'm_X': hyperopt.hp.randint('m_X', 17),
+         'm_Y': hyperopt.hp.randint('m_Y', 17),
+         'dropout': hyperopt.hp.randint('dropout', 2),
+         'learning_rate_exp': hyperopt.hp.quniform('learning_rate_exp',
+                                                   2.5, 8.5, 1),
+         'momentum': hyperopt.hp.uniform('momentum', 0, 1)}
+
+trials = hyperopt.Trials()
+best = hyperopt.fmin(objective, space=space, algo=hyperopt.tpe.suggest,
+                     max_evals=1000, trials=trials)
+
+with open('trials.pkl', 'wb') as f:
+    pickle.dump(trials.trials)
+with open('results.pkl', 'wb') as f:
+    pickle.dump(trials.results)
+with open('best.pkl', 'wb') as f:
+    pickle.dump(best)
