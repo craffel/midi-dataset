@@ -44,7 +44,7 @@ def objective(params):
         mrr_samples=mrr_samples, n_bits=16, learning_rate=learning_rate,
         **params)
     for k, v in params.items():
-        print '{} : {}'.format(k, v),
+        print '{} : {},'.format(k, v),
     print 'n_layers: {}'.format(n_layers),
     print 'learning_rate: {}'.format(learning_rate)
     success = np.all([np.isfinite(e['validate_cost']) for e in epochs])
