@@ -151,12 +151,8 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
         cost_p = T.sum((X_p_output - Y_p_output)**2)
         # Thresholded, scaled cost of cross-modality negative examples
         cost_n = alpha_XY*hinge_cost(m_XY, X_n_output, Y_n_output)
-        # Thresholded, scaled cost of x-modality negative examples
-        cost_x = alpha_X*hinge_cost(m_X, X_p_output, X_n_output)
-        # Thresholded, scaled cost of y-modality negative examples
-        cost_y = alpha_Y*hinge_cost(m_Y, Y_p_output, Y_n_output)
         # Return sum of these costs
-        return cost_p + cost_n + cost_x + cost_y
+        return cost_p + cost_n
 
     # Function for optimizing the neural net parameters, by minimizing cost
     params = (nntools.layers.get_all_params(layers_X[-1])

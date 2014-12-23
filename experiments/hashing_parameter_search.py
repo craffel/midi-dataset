@@ -62,11 +62,7 @@ def objective(params):
 
 space = {'n_layers': 3,  # hyperopt.hp.quniform('n_layers', 3, 4, 1),
          'alpha_XY': hyperopt.hp.lognormal('alpha_XY', 0, 1),
-         'alpha_X': hyperopt.hp.lognormal('alpha_X', 0, 1),
-         'alpha_Y': hyperopt.hp.lognormal('alpha_Y', 0, 1),
          'm_XY': hyperopt.hp.randint('m_XY', 17),
-         'm_X': hyperopt.hp.randint('m_X', 17),
-         'm_Y': hyperopt.hp.randint('m_Y', 17),
          'dropout': False,
          'learning_rate_exp': hyperopt.hp.quniform('learning_rate_exp',
                                                    2.5, 8.5, 1),
