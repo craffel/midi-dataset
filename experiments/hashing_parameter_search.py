@@ -43,10 +43,6 @@ def objective(params):
         [hidden_layer_size_Y]*(n_layers - 1),
         mrr_samples=mrr_samples, n_bits=16, learning_rate=learning_rate,
         **params)
-    for k, v in params.items():
-        print '{} : {},'.format(k, v),
-    print 'n_layers: {}'.format(n_layers),
-    print 'learning_rate: {}'.format(learning_rate)
     success = np.all([np.isfinite(e['validate_cost']) for e in epochs])
     if len(epochs) == 0 or not success:
         print '    Failed to converge.'
@@ -54,13 +50,26 @@ def objective(params):
         return {'loss': 0, 'status': hyperopt.STATUS_FAIL, 'epochs': epochs}
     else:
         best_mrr = np.max([e['validate_mrr_pessimist'] for e in epochs])
-        print '   Best MRR {} in {} epochs'.format(best_mrr, len(epochs))
-        print
+        if best_mrr > objective.best_mrr:
+            best_epoch = [e for e in epochs
+                          if e['validate_mrr_pessimist'] == best_mrr][0]
+            print 'New best MRR {}'.format(best_mrr, len(epochs))
+            for k, v in best_epoch.items():
+                print '{} : {},'.format(k, v),
+            print
+            for k, v in params.items():
+                print '{} : {},'.format(k, v),
+            print 'n_layers: {}'.format(n_layers),
+            print 'learning_rate: {}'.format(learning_rate)
+            print
+            objective.best_mrr = best_mrr
         return {'loss': -best_mrr,
                 'status': hyperopt.STATUS_OK,
                 'epochs': epochs}
 
-space = {'n_layers': 3,  # hyperopt.hp.quniform('n_layers', 3, 4, 1),
+objective.best_mrr = 0
+
+space = {'n_layers': hyperopt.hp.quniform('n_layers', 3, 4, 1),
          'alpha_XY': hyperopt.hp.lognormal('alpha_XY', 0, 1),
          'm_XY': hyperopt.hp.randint('m_XY', 17),
          'dropout': False,
@@ -69,8 +78,11 @@ space = {'n_layers': 3,  # hyperopt.hp.quniform('n_layers', 3, 4, 1),
          'momentum': hyperopt.hp.uniform('momentum', 0, 1)}
 
 trials = hyperopt.Trials()
-best = hyperopt.fmin(objective, space=space, algo=hyperopt.tpe.suggest,
-                     max_evals=1000, trials=trials)
+try:
+    best = hyperopt.fmin(objective, space=space, algo=hyperopt.tpe.suggest,
+                         max_evals=100, trials=trials)
+except KeyboardInterrupt:
+    pass
 
 with open('trials.pkl', 'wb') as f:
     pickle.dump(trials.trials, f)
