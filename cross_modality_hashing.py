@@ -188,6 +188,9 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
                                                  max_iter)
     for n, (X_p, Y_p, X_n, Y_n) in enumerate(data_iterator):
         train_cost = train(X_p, X_n, Y_p, Y_n)
+        if not np.isfinite(train_cost):
+            print 'Bad training cost {} at iteration {}'.format(train_cost, n)
+            break
         # Validate the net after each epoch
         if n and (not n % epoch_size):
             epoch_result = collections.OrderedDict()
@@ -233,10 +236,6 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
 
             # Store scores and statistics for this epoch
             epochs.append(epoch_result)
-
-            # Stop training if cost is inf/nan
-            if not np.isfinite(epoch_result['validate_cost']):
-                break
 
         if n > patience:
             break
