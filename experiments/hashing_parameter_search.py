@@ -16,12 +16,8 @@ training_data_directory = os.path.join(base_data_directory, 'hash_dataset',
 X, Y = hashing_utils.load_data(training_data_directory)
 # Split into train and validate and standardize
 (X_train, Y_train, X_validate,
- Y_validate) = hashing_utils.train_validate_split(X, Y, .99)
+ Y_validate) = hashing_utils.train_validate_split(X, Y, .9)
 
-# Use this many samples to compute mean reciprocal rank
-n_mrr_samples = 500
-# Pre-compute indices over which to compute mrr
-mrr_samples = np.random.choice(X_validate.shape[0], n_mrr_samples, False)
 
 # Compute layer sizes.  Middle layers are nextpow2(input size)
 hidden_layer_size_X = int(2**np.ceil(np.log2(X_train.shape[1])))
@@ -41,19 +37,18 @@ def objective(params):
         X_train, Y_train, X_validate, Y_validate,
         [hidden_layer_size_X]*(n_layers - 1),
         [hidden_layer_size_Y]*(n_layers - 1),
-        mrr_samples=mrr_samples, n_bits=16, learning_rate=learning_rate,
-        **params)
+        n_bits=16, learning_rate=learning_rate, **params)
     success = np.all([np.isfinite(e['validate_cost']) for e in epochs])
     if len(epochs) == 0 or not success:
         print '    Failed to converge.'
         print
         return {'loss': 0, 'status': hyperopt.STATUS_FAIL, 'epochs': epochs}
     else:
-        best_mrr = np.max([e['validate_mrr_pessimist'] for e in epochs])
-        if best_mrr > objective.best_mrr:
+        best_objective = np.min([e['validate_objective'] for e in epochs])
+        if best_objective < objective.best_objective:
             best_epoch = [e for e in epochs
-                          if e['validate_mrr_pessimist'] == best_mrr][0]
-            print 'New best MRR {}'.format(best_mrr, len(epochs))
+                          if e['validate_objective'] == best_objective][0]
+            print 'New best {}'.format(best_objective, len(epochs))
             for k, v in best_epoch.items():
                 print '{} : {},'.format(k, v),
             print
@@ -62,12 +57,12 @@ def objective(params):
             print 'n_layers: {}'.format(n_layers),
             print 'learning_rate: {}'.format(learning_rate)
             print
-            objective.best_mrr = best_mrr
-        return {'loss': -best_mrr,
+            objective.best_objective = best_objective
+        return {'loss': best_objective,
                 'status': hyperopt.STATUS_OK,
                 'epochs': epochs}
 
-objective.best_mrr = 0
+objective.best_objective = np.inf
 
 space = {'n_layers': hyperopt.hp.quniform('n_layers', 3, 4, 1),
          'alpha_XY': hyperopt.hp.lognormal('alpha_XY', 0, 1),
@@ -81,6 +76,8 @@ trials = hyperopt.Trials()
 try:
     best = hyperopt.fmin(objective, space=space, algo=hyperopt.tpe.suggest,
                          max_evals=100, trials=trials)
+    with open('best.pkl', 'wb') as f:
+        pickle.dump(best, f)
 except KeyboardInterrupt:
     pass
 
@@ -88,5 +85,3 @@ with open('trials.pkl', 'wb') as f:
     pickle.dump(trials.trials, f)
 with open('results.pkl', 'wb') as f:
     pickle.dump(trials.results, f)
-with open('best.pkl', 'wb') as f:
-    pickle.dump(best, f)

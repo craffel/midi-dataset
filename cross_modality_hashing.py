@@ -27,8 +27,7 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
                                 batch_size=100, epoch_size=1000,
                                 initial_patience=10000,
                                 improvement_threshold=0.995,
-                                patience_increase=1.1, max_iter=200000,
-                                mrr_samples=None):
+                                patience_increase=1.1, max_iter=200000):
     ''' Utility function for training a siamese net for cross-modality hashing
     So many parameters.
     Assumes X_train[n] should be mapped close to Y_train[m] only when n == m
@@ -72,9 +71,6 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
             Amount to increase patience when validation cost has decreased
         - max_iter : int
             Maximum number of batches to train on, default 200000
-        - mrr_samples : int
-            Indices of samples in the validation set over which to compute mean
-            reciprocal rank.  None means use entire validation set.
 
     :returns:
         - epochs : list
@@ -127,7 +123,7 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
     # Compute \sum max(0, m - ||a - b||_2)^2
     def hinge_cost(m, a, b):
         dist = m - T.sqrt(T.sum((a - b)**2, axis=1))
-        return T.sum((dist*(dist > 0))**2)
+        return T.mean((dist*(dist > 0))**2)
 
     def hasher_cost(deterministic):
         X_p_output = layers_X[-1].get_output(X_p_input,
@@ -140,7 +136,7 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
                                              deterministic=deterministic)
 
         # Unthresholded, unscaled cost of positive examples across modalities
-        cost_p = T.sum((X_p_output - Y_p_output)**2)
+        cost_p = T.mean((X_p_output - Y_p_output)**2)
         # Thresholded, scaled cost of cross-modality negative examples
         cost_n = alpha_XY*hinge_cost(m_XY, X_n_output, Y_n_output)
         # Return sum of these costs
@@ -172,6 +168,7 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
     # Create fixed negative example validation set
     X_validate_n = X_validate[np.random.permutation(X_validate.shape[0])]
     Y_validate_n = Y_validate[np.random.permutation(Y_validate.shape[0])]
+    X_validate_shuffle = np.random.permutation(X_validate.shape[0])
     data_iterator = hashing_utils.get_next_batch(X_train, Y_train, batch_size,
                                                  max_iter)
     for n, (X_p, Y_p, X_n, Y_n) in enumerate(data_iterator):
@@ -193,13 +190,13 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
             X_val_output = X_output.eval({X_input: X_validate})
             Y_val_output = Y_output.eval({Y_input: Y_validate})
             name = 'validate'
-            N = X_val_output.shape[0]
             # Compute on the resulting hashes
             correct, in_mean, in_std = hashing_utils.statistics(
                 X_val_output > 0, Y_val_output > 0)
             collisions, out_mean, out_std = hashing_utils.statistics(
-                X_val_output[np.random.permutation(N)] > 0,
+                X_val_output[X_validate_shuffle] > 0,
                 Y_val_output > 0)
+            N = X_val_output.shape[0]
             epoch_result[name + '_accuracy'] = correct/float(N)
             epoch_result[name + '_in_class_distance_mean'] = in_mean
             epoch_result[name + '_in_class_distance_std'] = in_std
@@ -210,17 +207,13 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
                 hashing_utils.hash_entropy(X_val_output > 0)
             epoch_result[name + '_hash_entropy_Y'] = \
                 hashing_utils.hash_entropy(Y_val_output > 0)
+            epoch_result[name + '_objective'] = in_mean/out_mean
 
             if epoch_result['validate_cost'] < current_validate_cost:
                 patience_cost = improvement_threshold*current_validate_cost
                 if epoch_result['validate_cost'] < patience_cost:
                     patience *= patience_increase
                 current_validate_cost = epoch_result['validate_cost']
-            # Only compute MRR on validate
-            mrr_pessimist, mrr_optimist = hashing_utils.mean_reciprocal_rank(
-                X_val_output[mrr_samples] > 0, Y_val_output > 0, mrr_samples)
-            epoch_result['validate_mrr_pessimist'] = mrr_pessimist
-            epoch_result['validate_mrr_optimist'] = mrr_optimist
 
             # Store scores and statistics for this epoch
             epochs.append(epoch_result)
