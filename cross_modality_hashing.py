@@ -73,10 +73,8 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
             Maximum number of batches to train on, default 200000
 
     :returns:
-        - epochs : list
-            List of epoch dicts, which contains scores computed at each epoch
-        - parameters : list
-            List of NN parameters after each epoch
+        - epoch : iterator
+            Results for each epoch are yielded
     '''
     # First neural net, for X modality
     X_p_input = T.matrix('X_p_input')
@@ -159,11 +157,10 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
     current_validate_cost = np.inf
 
     # Functions for computing the neural net output on the train and val sets
-    X_output = layers_X[-1].get_output(X_input, deterministic=True)
-    Y_output = layers_Y[-1].get_output(Y_input, deterministic=True)
-
-    # A list of epoch result dicts, one per epoch
-    epochs = []
+    X_output = theano.function(
+        [X_input], layers_X[-1].get_output(X_input, deterministic=True))
+    Y_output = theano.function(
+        [Y_input], layers_Y[-1].get_output(Y_input, deterministic=True))
 
     # Create fixed negative example validation set
     X_validate_n = X_validate[np.random.permutation(X_validate.shape[0])]
@@ -187,8 +184,8 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
                 X_validate, X_validate_n, Y_validate, Y_validate_n)
 
             # Compute statistics on validation set only
-            X_val_output = X_output.eval({X_input: X_validate})
-            Y_val_output = Y_output.eval({Y_input: Y_validate})
+            X_val_output = X_output(X_validate)
+            Y_val_output = Y_output(Y_validate)
             name = 'validate'
             # Compute on the resulting hashes
             correct, in_mean, in_std = hashing_utils.statistics(
@@ -216,9 +213,9 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
                 current_validate_cost = epoch_result['validate_cost']
 
             # Store scores and statistics for this epoch
-            epochs.append(epoch_result)
+            yield epoch_result, X_output, Y_output
 
         if n > patience:
             break
 
-    return epochs
+    return
