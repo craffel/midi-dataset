@@ -4,7 +4,7 @@ Functions for mapping data in different modalities to a common Hamming space
 import numpy as np
 import theano.tensor as T
 import theano
-import nntools
+import lasagne
 import hashing_utils
 import collections
 
@@ -89,34 +89,34 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
     # X-modality hashing network
     layers_X = []
     # Start with input layer
-    layers_X.append(nntools.layers.InputLayer(
+    layers_X.append(lasagne.layers.InputLayer(
         shape=(batch_size, X_train.shape[1])))
     # Add each hidden layer recursively
     for num_units in hidden_layer_sizes_X:
-        layers_X.append(nntools.layers.DenseLayer(
+        layers_X.append(lasagne.layers.DenseLayer(
             layers_X[-1], num_units=num_units,
-            nonlinearity=nntools.nonlinearities.tanh))
+            nonlinearity=lasagne.nonlinearities.tanh))
         if dropout:
-            layers_X.append(nntools.layers.DropoutLayer(layers_X[-1]))
+            layers_X.append(lasagne.layers.DropoutLayer(layers_X[-1]))
     # Add output layer
-    layers_X.append(nntools.layers.DenseLayer(
+    layers_X.append(lasagne.layers.DenseLayer(
         layers_X[-1], num_units=n_bits,
-        nonlinearity=nntools.nonlinearities.tanh))
+        nonlinearity=lasagne.nonlinearities.tanh))
 
     # Y-modality hashing network
     layers_Y = []
     # As above
-    layers_Y.append(nntools.layers.InputLayer(
+    layers_Y.append(lasagne.layers.InputLayer(
         shape=(batch_size, Y_train.shape[1])))
     for num_units in hidden_layer_sizes_Y:
-        layers_Y.append(nntools.layers.DenseLayer(
+        layers_Y.append(lasagne.layers.DenseLayer(
             layers_Y[-1], num_units=num_units,
-            nonlinearity=nntools.nonlinearities.tanh))
+            nonlinearity=lasagne.nonlinearities.tanh))
         if dropout:
-            layers_Y.append(nntools.layers.DropoutLayer(layers_Y[-1]))
-    layers_Y.append(nntools.layers.DenseLayer(
+            layers_Y.append(lasagne.layers.DropoutLayer(layers_Y[-1]))
+    layers_Y.append(lasagne.layers.DenseLayer(
         layers_Y[-1], num_units=n_bits,
-        nonlinearity=nntools.nonlinearities.tanh))
+        nonlinearity=lasagne.nonlinearities.tanh))
 
     # Compute \sum max(0, m - ||a - b||_2)^2
     def hinge_cost(m, a, b):
@@ -141,9 +141,9 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
         return cost_p + cost_n
 
     # Function for optimizing the neural net parameters, by minimizing cost
-    params = (nntools.layers.get_all_params(layers_X[-1])
-              + nntools.layers.get_all_params(layers_Y[-1]))
-    updates = nntools.updates.nesterov_momentum(hasher_cost(False), params,
+    params = (lasagne.layers.get_all_params(layers_X[-1])
+              + lasagne.layers.get_all_params(layers_Y[-1]))
+    updates = lasagne.updates.nesterov_momentum(hasher_cost(False), params,
                                                 learning_rate, momentum)
     train = theano.function(
         [X_p_input, X_n_input, Y_p_input, Y_n_input], hasher_cost(False),
