@@ -33,11 +33,12 @@ def objective(params):
     params = dict([(k, v) for k, v in params.items()
                    if k != 'n_layers' and k != 'learning_rate_exp'])
 
-    epochs = [e for e in cross_modality_hashing.train_cross_modality_hasher(
-        X_train, Y_train, X_validate, Y_validate,
-        [hidden_layer_size_X]*(n_layers - 1),
-        [hidden_layer_size_Y]*(n_layers - 1),
-        n_bits=16, learning_rate=learning_rate, **params)]
+    epochs = [epoch for epoch, _, _ in
+              cross_modality_hashing.train_cross_modality_hasher(
+                  X_train, Y_train, X_validate, Y_validate,
+                  [hidden_layer_size_X]*(n_layers - 1),
+                  [hidden_layer_size_Y]*(n_layers - 1), n_bits=16,
+                  learning_rate=learning_rate, **params)]
     success = np.all([np.isfinite(e['validate_cost']) for e in epochs])
     if len(epochs) == 0 or not success:
         print '    Failed to converge.'
