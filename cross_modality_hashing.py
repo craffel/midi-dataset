@@ -213,7 +213,11 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
                 current_validate_cost = epoch_result['validate_cost']
 
             # Store scores and statistics for this epoch
-            yield epoch_result, X_output, Y_output
+            X_params = lasagne.layers.get_all_params(layers_X[-1])
+            Y_params = lasagne.layers.get_all_params(layers_Y[-1])
+            yield (epoch_result,
+                   [p.get_value() for p in X_params],
+                   [p.get_value() for p in Y_params])
 
         if n > patience:
             break
