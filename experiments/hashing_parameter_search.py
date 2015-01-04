@@ -73,16 +73,19 @@ space = {'n_layers': hyperopt.hp.quniform('n_layers', 3, 4, 1),
                                                    2.5, 8.5, 1),
          'momentum': hyperopt.hp.uniform('momentum', 0, 1)}
 
+if not os.path.exists('../results'):
+    os.makedirs('../results')
+
 trials = hyperopt.Trials()
 try:
     best = hyperopt.fmin(objective, space=space, algo=hyperopt.tpe.suggest,
                          max_evals=100, trials=trials)
-    with open('best.pkl', 'wb') as f:
+    with open('../results/best.pkl', 'wb') as f:
         pickle.dump(best, f)
 except KeyboardInterrupt:
     pass
 
-with open('trials.pkl', 'wb') as f:
+with open('../results/trials.pkl', 'wb') as f:
     pickle.dump(trials.trials, f)
-with open('results.pkl', 'wb') as f:
+with open('../results/results.pkl', 'wb') as f:
     pickle.dump(trials.results, f)
