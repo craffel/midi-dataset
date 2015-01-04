@@ -7,6 +7,8 @@ import theano
 import glob
 import os
 import scipy.spatial
+import pickle
+import lasagne
 
 
 def shingle(x, stacks):
@@ -241,3 +243,48 @@ def mean_reciprocal_rank(X, Y, indices):
     n_lt = distance_matrix.T < distance_matrix[np.arange(X.shape[0]), indices]
     return (np.mean(1./n_le.sum(axis=0)),
             np.mean(1./(n_lt.sum(axis=0) + 1)))
+
+
+def save_model(param_list, output_file):
+    '''
+    Write out a pickle file of a hashing network
+
+    :parameters:
+        - param_list : list of np.ndarray
+            A list of values, per layer, of the parameters of the network
+        - output_file : str
+            Path to write the file to
+    '''
+    with open(output_file, 'wb') as f:
+        pickle.dump(param_list, f)
+
+
+def load_model(param_list, batch_size):
+    '''
+    Create a hashing network based on a list of per-layer parameters
+
+    :parameters:
+        - param_list : list of np.ndarray
+            A list of values, per layer, of the parameters of the network
+        - batch_size : int
+            The input batch size, which cannot be inferred from the parameter
+            shapes
+
+    :returns:
+        - layers : list of lasagne.layers.Layer
+            List of all layers in the network
+    '''
+    # Layers in the hashing network
+    layers = []
+    # Start with input layer
+    layers.append(lasagne.layers.InputLayer(
+        shape=(batch_size, param_list[-2].shape[0])))
+    # Add each hidden layer recursively
+    for W, b in zip(param_list[-2::-2], param_list[::-2]):
+        layers.append(lasagne.layers.DenseLayer(
+            layers[-1], num_units=W.shape[1],
+            nonlinearity=lasagne.nonlinearities.tanh))
+        # Set the param value according to the input
+        layers[-1].W.set_value(W.astype(theano.config.floatX))
+        layers[-1].b.set_value(b.astype(theano.config.floatX))
+    return layers
