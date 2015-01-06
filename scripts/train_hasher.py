@@ -46,7 +46,7 @@ def train(params):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train a hasher')
-    parser.add_argument('--n_layers', dest='n_layers', type=int, default=3,
+    parser.add_argument('--n_layers', dest='n_layers', type=int, default=4,
                         help='Number of layers')
     parser.add_argument('--alpha_XY', dest='alpha_XY', type=float, default=.05,
                         help='alpha_XY regularization parameter')
