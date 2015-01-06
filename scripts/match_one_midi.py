@@ -12,7 +12,11 @@ import theano.tensor as T
 import hash_match
 import numpy as np
 import time
+import argparse
+import unicodedata
+import tabulate
 
+print "Loading in MSD data ..."
 # Load in all hashed MSD sequences
 data = []
 for pkl_file in glob.glob('../data/msd/pkl/*/*/*.pkl'):
@@ -20,10 +24,10 @@ for pkl_file in glob.glob('../data/msd/pkl/*/*/*.pkl'):
         try:
             data.append(pickle.load(f))
         except:
-            print 'Error loading {}'.format(pkl_file)
+            pass
 
 # Store sequence lengths
-lengths = np.array([d['hash_list'].shape[0] for d in data])
+lengths = np.array([d['duration'] for d in data])
 # Sort data by sequence length
 sorted_idx = np.argsort(lengths)
 data = [data[n] for n in sorted_idx]
@@ -31,6 +35,7 @@ data = [data[n] for n in sorted_idx]
 sequences = [d['hash_list'] for d in data]
 lengths = lengths[sorted_idx]
 
+print "Loading in hasher ..."
 # Load in the MIDI hasher
 with open('../results/model_X.pkl') as f:
     hasher_params = pickle.load(f)
@@ -62,16 +67,37 @@ def match_one_midi(midi_file):
     query = query.astype('uint16')
     # Match the MIDI file query hash list against all sequences
     matches, scores = hash_match.match_one_sequence(
-        query, sequences, lengths, .1, 25, .95, 8)
+        query, pm.get_end_time(), sequences, lengths, .05, 25, .95, 8)
     return matches, scores
 
+clean = lambda string : unicodedata.normalize(
+    'NFKD', unicode(string, 'utf-8', 'ignore')).encode('ascii', 'ignore')
 
 if __name__ == '__main__':
-    # Get input MIDI filename
-    midi_filename = sys.argv[1]
+    parser = argparse.ArgumentParser(description='Match a single MIDI file')
+    parser.add_argument('midi_file', type=str, help='Path to a MIDI file')
+    parser.add_argument('artist', nargs='?', type=str, default=None,
+                        help='Artist (optional)')
+    parser.add_argument('title', nargs='?', type=str, default=None,
+                        help='Title (optional)')
+    args = vars(parser.parse_args())
+    print "Supplied file has duration {}".format(
+        pretty_midi.PrettyMIDI(args['midi_file']).get_end_time())
+    if args['title'] is not None and args['artist'] is not None:
+        print "Expected matches:"
+        artist = clean(args['artist']).lower()
+        title = clean(args['title']).lower()
+        print tabulate.tabulate(
+            [[n, d['artist'], d['title'], d['duration']]
+             for n, d in enumerate(data)
+             if title in d['title'].lower() and artist in d['artist'].lower()],
+            headers=['ID', 'Artist', 'Title', 'Duration'])
+    print "Matching ..."
     now = time.time()
-    matches, scores = match_one_midi(midi_filename)
-    print "Matching took {}s".format(time.time() - now)
+    matches, scores = match_one_midi(args['midi_file'])
+    print "  took {:.3f}s".format(time.time() - now)
     print "Top 20 matches:"
-    for n, score in zip(matches[:20], scores[:20]):
-        print '{} - {} : {}'.format(data[n]['artist'], data[n]['title'], score)
+    print tabulate.tabulate(
+        [[n, clean(data[n]['artist']), clean(data[n]['title']), score]
+         for n, score in zip(matches[:20], scores[:20])],
+        headers=['ID', 'Artist', 'Title', 'Score'])

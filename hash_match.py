@@ -203,14 +203,16 @@ def lb_keogh(u, l, y, bits_set=bits_set):
     return bound/float(u.shape[0])
 
 
-def match_one_sequence(query, sequences, lengths, length_tolerance,
-                       radius, gully, penalty):
+def match_one_sequence(query, query_length, sequences, lengths,
+                       length_tolerance, radius, gully, penalty):
     '''
     Match a query sequence to one of the sequences in a list
 
     :parameters:
         - query : np.ndarray, dtype='uint16'
             Query sequence
+        - query_length : float
+            The length of the query.
         - sequences : list of np.ndarray, dtype='uint16'
             Sequences to find matches in, sorted by sequence length
         - lengths : list of int
@@ -238,9 +240,9 @@ def match_one_sequence(query, sequences, lengths, length_tolerance,
     best_so_far = np.inf
     # Find start and end of the range of sequences which are within
     # length_tolerance percent of query length
-    start = np.searchsorted(lengths, (1 - length_tolerance)*query.shape[0])
+    start = np.searchsorted(lengths, (1 - length_tolerance)*query_length)
     end = np.searchsorted(lengths,
-                          (1 + length_tolerance)*query.shape[0],
+                          (1 + length_tolerance)*query_length,
                           'right')
     # Pre-compute Keogh upper and lower envelopes
     u, l = keogh_envelopes(query, radius)
