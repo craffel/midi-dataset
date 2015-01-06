@@ -46,10 +46,12 @@ for h5_file in glob.glob(h5_glob):
     msd_features = np.vstack([chroma, timbre, loudness])
     msd_features = msd_features.T
     msd_features = hashing_utils.shingle(msd_features, 4)
+    mean, std = hashing_utils.standardize(msd_features)
+    msd_features = (msd_features - mean)/std
     if np.isnan(msd_features).any():
         continue
     hashed_features = hash(msd_features.astype(theano.config.floatX))
-    hashes = hash_match.vectors_to_ints(hashed_features).astype('uint16')
+    hashes = hash_match.vectors_to_ints(hashed_features > 0).astype('uint16')
     h5_dict = {'artist': artist, 'title': title, 'hash_list': hashes}
     output_filename = h5_file.replace('h5', 'pkl')
     if not os.path.exists(os.path.split(output_filename)[0]):
