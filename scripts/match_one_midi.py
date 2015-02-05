@@ -19,7 +19,7 @@ import tabulate
 print "Loading in MSD data ..."
 # Load in all hashed MSD sequences
 data = []
-for pkl_file in glob.glob('../data/msd/pkl/*/*/*.pkl'):
+for pkl_file in glob.glob('../data/msd/pkl/*/*/*/*.pkl'):
     with open(pkl_file) as f:
         try:
             data.append(pickle.load(f))
