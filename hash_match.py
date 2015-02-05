@@ -292,7 +292,7 @@ def match_one_sequence(query, query_length, sequences, lengths,
             if score < best_so_far:
                 best_so_far = score
     # Sort the scores and matches
-    idx = np.argsort(scores)
-    matches = np.array(matches)[idx]
-    scores = np.array(scores)[idx]
+    sorted_idx = np.argsort(scores)
+    matches = [matches[n] for n in sorted_idx]
+    scores = [scores[n] for n in sorted_idx]
     return matches, scores
