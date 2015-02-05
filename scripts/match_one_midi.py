@@ -81,17 +81,6 @@ if __name__ == '__main__':
     parser.add_argument('title', nargs='?', type=str, default=None,
                         help='Title (optional)')
     args = vars(parser.parse_args())
-    print "Supplied file has duration {}".format(
-        pretty_midi.PrettyMIDI(args['midi_file']).get_end_time())
-    if args['title'] is not None and args['artist'] is not None:
-        print "Expected matches:"
-        artist = clean(args['artist']).lower()
-        title = clean(args['title']).lower()
-        print tabulate.tabulate(
-            [[n, d['artist'], d['title'], d['duration']]
-             for n, d in enumerate(data)
-             if title in d['title'].lower() and artist in d['artist'].lower()],
-            headers=['ID', 'Artist', 'Title', 'Duration'])
     print "Matching ..."
     now = time.time()
     matches, scores = match_one_midi(args['midi_file'])
@@ -101,3 +90,17 @@ if __name__ == '__main__':
         [[n, clean(data[n]['artist']), clean(data[n]['title']), score]
          for n, score in zip(matches[:20], scores[:20])],
         headers=['ID', 'Artist', 'Title', 'Score'])
+
+    if args['title'] is not None and args['artist'] is not None:
+        print "Supplied file has duration {}".format(
+            pretty_midi.PrettyMIDI(args['midi_file']).get_end_time())
+        print "Scores for expected matches:"
+        artist = clean(args['artist']).lower()
+        title = clean(args['title']).lower()
+        expected_matches = [n for n, d in enumerate(data) if (
+            title in d['title'].lower() and artist in d['artist'].lower())]
+        print tabulate.tabulate(
+            [[n, clean(data[n]['artist']), clean(data[n]['title']),
+              '--' if n not in matches else scores[matches.index(n)],
+              data[n]['duration']] for n in expected_matches],
+            headers=['ID', 'Artist', 'Title', 'Score', 'Duration'])
