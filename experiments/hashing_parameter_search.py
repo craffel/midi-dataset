@@ -10,14 +10,16 @@ import pickle
 
 # Set up paths
 base_data_directory = '../data'
-training_data_directory = os.path.join(base_data_directory, 'hash_dataset',
-                                       'npz')
+hash_data_directory = os.path.join(base_data_directory, 'hash_dataset')
+with open(os.path.join(hash_data_directory, 'train.csv')) as f:
+    train_list = f.read().splitlines()
+with open(os.path.join(hash_data_directory, 'valid.csv')) as f:
+    valid_list = f.read().splitlines()
+with open(os.path.join(hash_data_directory, 'test.csv')) as f:
+    test_list = f.read().splitlines()
 # Load in the data
-X, Y = hashing_utils.load_data(training_data_directory)
-# Split into train and validate and standardize
 (X_train, Y_train, X_validate,
- Y_validate) = hashing_utils.train_validate_split(X, Y, .9)
-
+ Y_validate, _, _) = hashing_utils.load_data(train_list, valid_list, test_list)
 
 # Compute layer sizes.  Middle layers are nextpow2(input size)
 hidden_layer_size_X = int(2**np.ceil(np.log2(X_train.shape[1])))

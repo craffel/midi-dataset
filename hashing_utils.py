@@ -4,11 +4,10 @@ statistics
 '''
 import numpy as np
 import theano
-import glob
-import os
 import scipy.spatial
 import pickle
 import lasagne
+import collections
 
 
 def shingle(x, stacks):
@@ -28,35 +27,6 @@ def shingle(x, stacks):
                       for n in xrange(stacks)])
 
 
-def load_data(directory, shingle_size=4):
-    ''' Load in all chroma matrices and piano rolls and output them as
-    separate matrices
-
-    :parameters:
-        - directory : string
-            Path to datast directory.  Expects .npz files which contain ['X']
-            and ['Y'] features for each modality.
-        - shingle_size : int
-            Number of copies of each column to stack
-
-    :returns:
-        - X : list
-            List of np.ndarrays of X modality features, each entry is a
-            different track
-        - Y : list
-            List of np.ndarrays of Y modality features, each entry is a
-            different track
-    '''
-    X = []
-    Y = []
-    for filename in glob.glob(os.path.join(directory, '*.npz')):
-        data = np.load(filename)
-        X.append(shingle(data['X'], shingle_size))
-        Y.append(shingle(data['Y'], shingle_size))
-    return ([np.array(x, dtype=theano.config.floatX, order='C') for x in X],
-            [np.array(y, dtype=theano.config.floatX, order='C') for y in Y])
-
-
 def standardize(X):
     ''' Return column vectors to standardize X, via (X - X_mean)/X_std
 
@@ -74,55 +44,62 @@ def standardize(X):
     return np.mean(X, axis=0), std + (std == 0)
 
 
-def train_validate_split(X, Y, split=.9):
-    ''' Splits a dataset into train and validate sets randomly and standardizes
-    them
+def load_data(train_list, valid_list, test_list, shingle_size=4):
+    '''
+    Load in dataset given lists of files in each split.
+    Also shindles and standardizes (using train mean/std) the data.
+    Each file should be a .npz file with a key 'X' for data in the X modality
+    and 'Y' for data in the Y modality.
 
     :parameters:
-        - X : list
-            List of np.ndarray data matrices in one modality
-        - Y : list
-            List of np.ndarray data matrices in another modality
-        - split : float
-            Proportion of data to keep in training set, default .9
+        - train_list : list of str
+            List of paths to files in the training set.
+        - valid_list : list of str
+            List of paths to files in the validation set.
+        - test_list : list of str
+            List of paths to files in the test set.
+        - shingle_size : int
+            Number of entries to shingle.
 
     :returns:
-        - X_train : np.ndarray
-            Vertically stacked data matrices in X training set
-        - Y_train : np.ndarray
-            Vertically stacked data matrices in Y training set
-        - X_validate : np.ndarray
-            Vertically stacked data matrices in X validation set
-        - Y_validate : np.ndarray
-            Vertically stacked data matrices in Y validation set
+        - X_train : list
+            List of np.ndarrays of X modality features in training set
+        - Y_train : list
+            List of np.ndarrays of Y modality features in training set
+        - X_valid : list
+            List of np.ndarrays of X modality features in validation set
+        - Y_valid : list
+            List of np.ndarrays of Y modality features in validation set
+        - X_test : list
+            List of np.ndarrays of X modality features in test set
+        - Y_test : list
+            List of np.ndarrays of Y modality features in test set
     '''
-    # Start as lists, will vstack later
-    X_train = []
-    Y_train = []
-    X_validate = []
-    Y_validate = []
-    # Randomly add data matrices to X and Y lists
-    for x, y in zip(X, Y):
-        if np.random.rand() < split:
-            X_train.append(x)
-            Y_train.append(y)
-        else:
-            X_validate.append(x)
-            Y_validate.append(y)
-    # Turn lists into large data matrices
-    X_train = np.vstack(X_train)
-    Y_train = np.vstack(Y_train)
-    X_validate = np.vstack(X_validate)
-    Y_validate = np.vstack(Y_validate)
-    # Standardize using statistics fom training set
-    X_mean, X_std = standardize(X_train)
-    X_train = (X_train - X_mean)/X_std
-    X_validate = (X_validate - X_mean)/X_std
-    Y_mean, Y_std = standardize(Y_train)
-    Y_train = (Y_train - Y_mean)/Y_std
-    Y_validate = (Y_validate - Y_mean)/Y_std
+    # We'll use dicts where key is the data subset, so we can iterate
+    X = collections.defaultdict(list)
+    Y = collections.defaultdict(list)
+    for file_list, key in zip([train_list, valid_list, test_list],
+                              ['train', 'valid', 'test']):
+        # Load in all files
+        for filename in file_list:
+            data = np.load(filename)
+            # Shingle and convert to floatX with correct column order
+            X[key].append(np.array(shingle(data['X'], shingle_size),
+                                   dtype=theano.config.floatX, order='C'))
+            Y[key].append(np.array(shingle(data['Y'], shingle_size),
+                                   dtype=theano.config.floatX, order='C'))
+        # Stack all examples into big matrix
+        X[key] = np.vstack(X[key])
+        Y[key] = np.vstack(Y[key])
+        # Get mean/std for training set
+        if key == 'train':
+            X_mean, X_std = standardize(X[key])
+            Y_mean, Y_std = standardize(Y[key])
+        # Use training set mean/std to standardize
+        X[key] = (X[key] - X_mean)/X_std
+        Y[key] = (Y[key] - Y_mean)/Y_std
 
-    return X_train, Y_train, X_validate, Y_validate
+    return X['train'], Y['train'], X['valid'], Y['valid'], X['test'], Y['test']
 
 
 def get_next_batch(X, Y, batch_size, n_iter):
