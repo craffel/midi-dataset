@@ -8,7 +8,7 @@ import scipy.ndimage
 N_BITS = 16
 
 # Construct "bits-set-table"
-bits_set = np.zeros(2**N_BITS).astype('uint16')
+bits_set = np.zeros(2**N_BITS, dtype=np.uint16)
 
 for i in xrange(2**N_BITS):
     bits_set[i] = (i & 1) + bits_set[i/2]
@@ -281,7 +281,7 @@ def match_one_sequence(query, query_length, sequences, lengths,
         if keogh_bound < best_so_far:
             # Compute distance matrix
             distance_matrix = np.empty(
-                (query.shape[0], sequences[n].shape[0])).astype('uint16')
+                (query.shape[0], sequences[n].shape[0]), dtype=np.uint16)
             int_dist(query, sequences[n], distance_matrix, bits_set)
             # Compute DTW distance
             score = dtw(distance_matrix, gully, penalty)
