@@ -37,5 +37,5 @@ data = read_sv.get_sv_list('file_lists/unique_tracks.txt', '<SEP>')
 to_path = lambda tid: os.path.join(tid[2], tid[3], tid[4], tid)
 data = [[row[0], row[1], row[2], row[3], to_path(row[0])] for row in data]
 json_utils.create_js(data,
-                     ['tracK_id', 'song_id', 'artist', 'title', 'path'],
+                     ['track_id', 'song_id', 'artist', 'title', 'path'],
                      'data/msd/index.js')
