@@ -1,7 +1,6 @@
 '''
-Given alignment results, create a dataset for hashing using those alignments
-which were sucessful (based on simple thresholding of dynamic programming
-score) consisting of beatwise MSD features and aligned beatwise MIDI piano roll
+Match the clean_midi dataset to the MSD using whoosh and write out npz files
+of features
 '''
 
 import sys

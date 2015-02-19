@@ -26,53 +26,62 @@ def train(params):
     # Load in the data
     (X_train, Y_train, X_validate, Y_validate) = hashing_utils.load_data(
         train_list, valid_list)
+    # TODO: Hack to use old convolutional hashing data
+    if X_train[0].ndim > 2:
+        X_train = [x[0] for x in X_train]
+        Y_train = [x[0] for x in Y_train]
+        X_validate = [x[0] for x in X_validate]
+        Y_validate = [x[0] for x in Y_validate]
+    # Compute max length as median of lengths
+    max_length_X = int(np.median([len(X) for X in X_train + X_validate]))
+    max_length_Y = int(np.median([len(Y) for Y in Y_train + Y_validate]))
+    # Turn into sequence matrices/masks
+    (X_train, X_train_mask, X_validate,
+     X_validate_mask) = hashing_utils.stack_sequences(
+         max_length_X, X_train, X_validate)
+    (Y_train, Y_train_mask, Y_validate,
+     Y_validate_mask) = hashing_utils.stack_sequences(
+         max_length_Y, Y_train, Y_validate)
 
-    # Use the # of hidden layers and the hidden layer power to construct a list
-    # [2^hidden_power, 2^hidden_power, ...n_hidden times...]
-    hidden_layer_sizes = [2**params['hidden_pow']]*params['n_hidden']
-    params['hidden_layer_sizes'] = {'X': hidden_layer_sizes,
-                                    'Y': hidden_layer_sizes}
-    # Use the number of convolutional layers to construct a list
-    # [16, 32 ...n_conv times]
-    num_filters = [2**(n + 4) for n in xrange(params['n_conv'])]
-    params['num_filters'] = {'X': num_filters, 'Y': num_filters}
-    # For X modality, first filter is 12 semitones tall.  For Y modality, that
-    # would squash the entire dimension, so the first filter is 3 tall
-    params['filter_size'] = {'X': [(5, 12)] + [(3, 3)]*(params['n_conv'] - 1),
-                             'Y': [(5, 12)] + [(3, 3)]*(params['n_conv'] - 1)}
-    # Construct a downsample list [(1, 2), (1, 2), ...n_conv times...]
-    ds = [(2, 2), (2, 2)] + [(1, 2)]*(params['n_conv'] - 2)
-    params['ds'] = {'X': ds, 'Y': ds}
-    # Remove hidden_pow, n_hidden, and n_conv parameters
+    # Compute layer sizes.  Middle layers are nextpow2(input size)
+    hidden_layer_size_X = int(2**np.ceil(np.log2(X_train.shape[2])))
+    hidden_layer_size_Y = int(2**np.ceil(np.log2(Y_train.shape[2])))
+    n_layers = int(params['n_layers'])
+    params['hidden_layer_sizes'] = {
+        'X': [hidden_layer_size_X]*(n_layers - 1),
+        'Y': [hidden_layer_size_Y]*(n_layers - 1)}
+    params['learning_rate'] = 10**(-params['learning_rate_exp'])
     params = dict([(k, v) for k, v in params.items()
-                   if k != 'hidden_pow' and k != 'n_hidden' and k != 'n_conv'])
+                   if k != 'n_layers' and k != 'learning_rate_exp'])
     print "Training ..."
-    epochs = [(epoch, X_params, Y_params) for (epoch, X_params, Y_params)
-              in cross_modality_hashing.train_cross_modality_hasher(
-                  X_train, Y_train, X_validate, Y_validate, **params)]
-    best_epoch = np.argmax([e[0]['validate_objective'] for e in epochs])
+    epochs = []
+    for epoch in cross_modality_hashing.train_cross_modality_hasher(
+            X_train, X_train_mask, Y_train, Y_train_mask, X_validate,
+            X_validate_mask, Y_validate, Y_validate_mask, **params):
+        print epoch[0]
+        epochs.append(epoch)
+
+    best_epoch = np.argmin([e[0]['validate_objective'] for e in epochs])
     print "Best objective {}".format(epochs[best_epoch][0])
     return epochs[best_epoch][1], epochs[best_epoch][2]
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train a hasher')
-    parser.add_argument('--alpha_XY', dest='alpha_XY', type=float, default=.5,
+    parser.add_argument('--n_layers', dest='n_layers', type=int, default=2,
+                        help='Number of layers')
+    parser.add_argument('--alpha_XY', dest='alpha_XY', type=float, default=.05,
                         help='alpha_XY regularization parameter')
-    parser.add_argument('--dropout', dest='dropout', type=bool, default=False,
-                        help='Should we use dropout?')
-    parser.add_argument('--hidden_pow', dest='hidden_pow', type=int,
-                        default=11, help='Hidden layer size exponent')
-    parser.add_argument('--learning_rate', dest='learning_rate', type=float,
-                        default=.001, help='Learning rate')
-    parser.add_argument('--m_XY', dest='m_XY', type=int, default=4,
+    parser.add_argument('--m_XY', dest='m_XY', type=int, default=16,
                         help='m_XY regularization threshold parameter')
+    parser.add_argument('--learning_rate_exp', dest='learning_rate_exp',
+                        type=int, default=2,
+                        help='Learning rate negative exponent')
     parser.add_argument('--momentum', dest='momentum', type=float,
-                        default=0.65, help='Optimization momentum')
-    parser.add_argument('--n_conv', dest='n_conv', type=int, default=2,
-                        help='Number of convolutional layers')
-    parser.add_argument('--n_hidden', dest='n_hidden', type=int, default=2,
-                        help='Number of hidden layers')
+                        default=.9,
+                        help='Optimization momentum hyperparameter')
+    parser.add_argument('--output_dim', dest='output_dim', type=int,
+                        default=128)
     X_params, Y_params = train(vars(parser.parse_args()))
     if not os.path.exists('../results'):
         os.path.makedirs('../results')

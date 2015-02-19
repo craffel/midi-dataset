@@ -10,6 +10,32 @@ import lasagne
 import collections
 
 
+def stack_sequences(max_length, *args):
+    '''
+    Given some lists of np.ndarrays, create a matrix of each list with a mask.
+    Accepts a variable number of lists.  Returns twice as many matrices as
+    lists - i.e., two matrices per list, in the order data, mask, data, mask...
+    Data matrices will hae shape (input.shape[0], max_length, input.shape[2])
+    Masks wwill have shape (input.shape[0], max_length)
+    '''
+    # Iterate over all provided lists of sequences
+    outputs = []
+    for data in args:
+        # Allocate a data matrix for all sequences
+        data_matrix = np.zeros((len(data), max_length, data[0].shape[-1]),
+                               dtype=theano.config.floatX)
+        # Mask has same shape, but no feature dimension
+        data_mask = np.zeros((len(data), max_length), dtype=np.bool)
+        # Fill in matrices and masks
+        for n, sequence in enumerate(data):
+            data_matrix[n, :sequence.shape[0]] = sequence[:max_length]
+            data_mask[n, :sequence.shape[0]] = 1
+        # Add in matrix and mask to function outputs
+        outputs.append(data_matrix)
+        outputs.append(data_mask)
+    return tuple(outputs)
+
+
 def standardize(X):
     ''' Return column vectors to standardize X, via (X - X_mean)/X_std
 
@@ -59,7 +85,7 @@ def load_data(train_list, valid_list):
         # Load in all files
         for filename in file_list:
             data = np.load(filename)
-            # Shingle and convert to floatX with correct column order
+            # Convert to floatX with correct column order
             X[key].append(np.array(
                 data['X'], dtype=theano.config.floatX, order='C'))
             Y[key].append(np.array(
@@ -140,12 +166,12 @@ def random_derangement(n):
                 return v
 
 
-def get_next_batch(X, Y, batch_size, sample_size, n_iter):
+def get_next_batch(X, X_mask, Y, Y_mask, batch_size, n_iter):
     ''' Randomly generates positive and negative example minibatches
 
     :parameters:
-        - X, Y : list of np.ndarray
-            List of data matrices in each modality
+        - X, X_mask, Y, Y_mask : np.ndarray
+            Ssequence tensors/mask matrices for X/Y modalities
         - batch_size : int
             Size of each minibatch to grab
         - sample_size : int
@@ -153,37 +179,35 @@ def get_next_batch(X, Y, batch_size, sample_size, n_iter):
         - n_iter : int
             Total number of iterations to run
 
-    :returns:
-        - X_p : np.ndarray
-            Positive example minibatch in X modality
-        - Y_p : np.ndarray
-            Positive example minibatch in Y modality
-        - X_n : np.ndarray
-            Negative example minibatch in X modality
-        - Y_n : np.ndarray
-            Negative example minibatch in Y modality
+    :yields:
+        - X_p, X_p_m, Y_p, Y_p_m, X_n, X_n_m, Y_n, Y_n_m : np.ndarray
+            Positive/negative example/mask minibatch in X/Y modality
     '''
+    N = X.shape[0]
     # These are dummy values which will force the sequences to be sampled
     current_batch = 1
     # We'll only know the number of batches after we sample sequences
     n_batches = 0
     for n in xrange(n_iter):
         if current_batch >= n_batches:
-            X_sampled, Y_sampled = sample_sequences(X, Y, sample_size)
-            N = X_sampled.shape[0]
-            n_batches = int(np.floor(N/float(batch_size)))
             # Shuffle X_p and Y_p the same
             positive_shuffle = np.random.permutation(N)
-            X_p = np.array(X_sampled[positive_shuffle])
-            Y_p = np.array(Y_sampled[positive_shuffle])
+            X_p = np.array(X[positive_shuffle])
+            X_p_m = np.array(X_mask[positive_shuffle])
+            Y_p = np.array(Y[positive_shuffle])
+            Y_p_m = np.array(Y_mask[positive_shuffle])
             # Shuffle X_n and Y_n differently (derangement ensures nothing
             # stays in the same place)
-            negative_shuffle = np.random.permutation(N)
-            X_n = np.array(X_sampled[negative_shuffle])
-            Y_n = np.array(Y_sampled[negative_shuffle][random_derangement(N)])
+            negative_shuffle_X = np.random.permutation(N)
+            negative_shuffle_Y = negative_shuffle_X[random_derangement(N)]
+            X_n = np.array(X[negative_shuffle_X])
+            X_n_m = np.array(X_mask[negative_shuffle_X])
+            Y_n = np.array(Y[negative_shuffle_Y])
+            Y_n_m = np.array(Y_mask[negative_shuffle_Y])
             current_batch = 0
         batch = slice(current_batch*batch_size, (current_batch + 1)*batch_size)
-        yield X_p[batch], Y_p[batch], X_n[batch], Y_n[batch]
+        yield (X_p[batch], X_p_m[batch], Y_p[batch], Y_p_m[batch],
+               X_n[batch], X_n_m[batch], Y_n[batch], Y_n_m[batch])
         current_batch += 1
 
 
@@ -265,65 +289,39 @@ def mean_reciprocal_rank(X, Y, indices):
             np.mean(1./(n_lt.sum(axis=0) + 1)))
 
 
-def build_network(input_shape, num_filters, filter_size, ds,
-                  hidden_layer_sizes, dropout, n_bits):
+def build_network(input_shape, hidden_layer_sizes, output_dim):
     '''
     Construct a list of layers of a network given the network's structure.
 
     :parameters:
         - input_shape : tuple
-            In what shape will data be supplied to the network?
-        - num_filters : list
-            Number of features in each convolutional layer
-        - filter_size : list
-            Number of features in each convolutional layer
-        - ds : dict of list
-            Number of features in each convolutional layer
+            Dimensionality of input to be fed into the network
         - hidden_layer_sizes : list
             Size of each hidden layer
-        - dropout : bool
-            Should dropout be applied between fully-connected layers?
-        - n_bits : int
+        - output_dim : int
             Output dimensionality
 
     :returns:
-        - layers : list
-            List of layer instances for this network.
+        - layers : dict
+            Dictionary which stores important layers in the network, with the
+            following mapping: `'in'` maps to the input layer, `'mask'`
+            maps to the mask input, and `'out'` maps to the output layer.
     '''
-    layers = [lasagne.layers.InputLayer(shape=input_shape)]
-    # Add each convolutional and pooling layer recursively
-    for n in xrange(len(num_filters)):
-        # We will initialize weights to \sqrt{2/n_l}
-        n_l = num_filters[n]*np.prod(filter_size[n])
-        layers.append(lasagne.layers.Conv2DLayer(
-            layers[-1], stride=(1, 1), num_filters=num_filters[n],
-            filter_size=filter_size[n],
-            nonlinearity=lasagne.nonlinearities.rectify,
-            W=lasagne.init.Normal(np.sqrt(2./n_l)),
-            border_mode='same'))
-        layers.append(lasagne.layers.MaxPool2DLayer(
-            layers[-1], ds[n]))
-    # A dense layer will treat any dimensions after the first as feature
-    # dimensions, but the third dimension is really a timestep dimension.
-    # We can only squash adjacent dimensions with a ReshapeLayer, so we
-    # need to place the time stpe dimension after the batch dimension
-    layers.append(lasagne.layers.DimshuffleLayer(
-        layers[-1], (0, 2, 1, 3)))
-    conv_output_shape = layers[-1].output_shape
-    # Reshape to (n_batch*n_time_steps, n_conv_output_features)
-    layers.append(lasagne.layers.ReshapeLayer(
-        layers[-1], (-1, conv_output_shape[2]*conv_output_shape[3])))
-    # Add dense hidden layers and optionally dropout
-    for hidden_layer_size in hidden_layer_sizes:
-        layers.append(lasagne.layers.DenseLayer(
-            layers[-1], num_units=hidden_layer_size,
-            nonlinearity=lasagne.nonlinearities.rectify))
-        if dropout:
-            layers.append(lasagne.layers.DropoutLayer(layers[-1], .5))
+    # Start with input layer
+    layer = lasagne.layers.InputLayer(shape=input_shape)
+    # Also create a separate mask input
+    mask_input = lasagne.layers.InputLayer(shape=input_shape[:2])
+    layers = {'in': layer, 'mask': mask_input}
+    n_batch, n_seq, _ = layer.input_var.shape
+    # Add each hidden layer recursively
+    for num_units in hidden_layer_sizes:
+        layer = lasagne.layers.LSTMLayer(
+            layer, num_units=num_units, mask_input=mask_input)
+    # Retrieve the last output from the layer
+    layer = lasagne.layers.SliceLayer(layer, -1, 1)
     # Add output layer
-    layers.append(lasagne.layers.DenseLayer(
-        layers[-1], num_units=n_bits,
-        nonlinearity=lasagne.nonlinearities.tanh))
+    layers['out'] = lasagne.layers.DenseLayer(
+        layer, num_units=output_dim, nonlinearity=lasagne.nonlinearities.tanh)
 
     return layers
 
