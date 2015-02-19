@@ -57,7 +57,7 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
             Whether to use dropout
         - learning_rate : float
             SGD learning rate
-        - momemntum : float
+        - momentum : float
             SGD momentum
         - batch_size : int
             Mini-batch size
