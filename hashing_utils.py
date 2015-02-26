@@ -44,7 +44,7 @@ def standardize(X):
     return np.mean(X, axis=0), std + (std == 0)
 
 
-def load_data(train_list, valid_list, test_list, shingle_size=4):
+def load_data(train_list, valid_list, shingle_size=4):
     '''
     Load in dataset given lists of files in each split.
     Also shindles and standardizes (using train mean/std) the data.
@@ -56,8 +56,6 @@ def load_data(train_list, valid_list, test_list, shingle_size=4):
             List of paths to files in the training set.
         - valid_list : list of str
             List of paths to files in the validation set.
-        - test_list : list of str
-            List of paths to files in the test set.
         - shingle_size : int
             Number of entries to shingle.
 
@@ -70,16 +68,12 @@ def load_data(train_list, valid_list, test_list, shingle_size=4):
             List of np.ndarrays of X modality features in validation set
         - Y_valid : list
             List of np.ndarrays of Y modality features in validation set
-        - X_test : list
-            List of np.ndarrays of X modality features in test set
-        - Y_test : list
-            List of np.ndarrays of Y modality features in test set
     '''
     # We'll use dicts where key is the data subset, so we can iterate
     X = collections.defaultdict(list)
     Y = collections.defaultdict(list)
-    for file_list, key in zip([train_list, valid_list, test_list],
-                              ['train', 'valid', 'test']):
+    for file_list, key in zip([train_list, valid_list],
+                              ['train', 'valid']):
         # Load in all files
         for filename in file_list:
             data = np.load(filename)
@@ -99,7 +93,7 @@ def load_data(train_list, valid_list, test_list, shingle_size=4):
         X[key] = (X[key] - X_mean)/X_std
         Y[key] = (Y[key] - Y_mean)/Y_std
 
-    return X['train'], Y['train'], X['valid'], Y['valid'], X['test'], Y['test']
+    return X['train'], Y['train'], X['valid'], Y['valid']
 
 
 def get_next_batch(X, Y, batch_size, n_iter):
