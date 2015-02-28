@@ -31,7 +31,7 @@ def standardize(X):
     ''' Return column vectors to standardize X, via (X - X_mean)/X_std
 
     :parameters:
-        - X : np.ndarray, shape=(n_features, n_examples)
+        - X : np.ndarray, shape=(n_examples, n_features)
             Data matrix
 
     :returns:
@@ -100,9 +100,9 @@ def get_next_batch(X, Y, batch_size, n_iter):
     ''' Randomly generates positive and negative example minibatches
 
     :parameters:
-        - X : np.ndarray, shape=(n_features, n_examples)
+        - X : np.ndarray, shape=(n_examples, n_features)
             Data matrix in one modality
-        - y : np.ndarray, shape=(n_features, n_examples)
+        - y : np.ndarray, shape=(n_examples, n_features)
             Data matrix in another modality
         - batch_size : int
             Size of each minibatch to grab
@@ -143,7 +143,7 @@ def hash_entropy(X):
     We want this to be close to n_bits.
 
     :parameters:
-        - X : np.ndarray, shape=(n_bits, n_examples)
+        - X : np.ndarray, shape=(n_examples, n_bits)
             Boolean data matrix, each column is the hash of an example
 
     :returns:
@@ -166,9 +166,9 @@ def statistics(X, Y):
     of Y
 
     :parameters:
-        - X : np.ndarray, shape=(n_features, n_examples)
+        - X : np.ndarray, shape=(n_examples, n_features)
             Data matrix of X modality
-        - Y : np.ndarray, shape=(n_features, n_examples)
+        - Y : np.ndarray, shape=(n_examples, n_features)
             Codeword matrix of Y modality
 
     :returns:
