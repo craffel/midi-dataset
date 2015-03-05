@@ -66,7 +66,7 @@ def objective(params):
 objective.best_objective = np.inf
 
 space = {'n_layers': hyperopt.hp.quniform('n_layers', 3, 4, 1),
-         'alpha_XY': hyperopt.hp.lognormal('alpha_XY', 0, 1),
+         'alpha_XY': hyperopt.hp.lognormal('alpha_XY', 0, 2),
          'm_XY': hyperopt.hp.randint('m_XY', 17),
          'dropout': False,
          'learning_rate_exp': hyperopt.hp.quniform('learning_rate_exp',

@@ -172,17 +172,17 @@ def statistics(X, Y):
             Codeword matrix of Y modality
 
     :returns:
-        - n_correct : int
-            Number of examples correctly hashed
+        - distance_distribution : int
+            Emprical distribution of the codeword distances
         - mean_distance : float
             Mean of distances between corresponding codewords
         - std_distance : float
             Std of distances between corresponding codewords
     '''
     points_equal = (X == Y)
-    return (np.all(points_equal, axis=1).sum(),
-            np.mean(np.logical_not(points_equal).sum(axis=1)),
-            np.std(np.logical_not(points_equal).sum(axis=1)))
+    distances = np.logical_not(points_equal).sum(axis=1)
+    counts = np.bincount(distances, minlength=X.shape[1] + 1)
+    return counts/float(X.shape[0]), np.mean(distances), np.std(distances)
 
 
 def mean_reciprocal_rank(X, Y, indices):

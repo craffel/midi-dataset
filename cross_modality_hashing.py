@@ -188,23 +188,22 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
             Y_val_output = Y_output(Y_validate)
             name = 'validate'
             # Compute on the resulting hashes
-            correct, in_mean, in_std = hashing_utils.statistics(
+            in_dist, in_mean, in_std = hashing_utils.statistics(
                 X_val_output > 0, Y_val_output > 0)
-            collisions, out_mean, out_std = hashing_utils.statistics(
-                X_val_output[X_validate_shuffle] > 0,
-                Y_val_output > 0)
-            N = X_val_output.shape[0]
-            epoch_result[name + '_accuracy'] = correct/float(N)
+            out_dist, out_mean, out_std = hashing_utils.statistics(
+                X_val_output[X_validate_shuffle] > 0, Y_val_output > 0)
+            epoch_result[name + '_accuracy'] = in_dist[0]
             epoch_result[name + '_in_class_distance_mean'] = in_mean
             epoch_result[name + '_in_class_distance_std'] = in_std
-            epoch_result[name + '_collisions'] = collisions/float(N)
+            epoch_result[name + '_collisions'] = out_dist[0]
             epoch_result[name + '_out_of_class_distance_mean'] = out_mean
             epoch_result[name + '_out_of_class_distance_std'] = out_std
             epoch_result[name + '_hash_entropy_X'] = \
                 hashing_utils.hash_entropy(X_val_output > 0)
             epoch_result[name + '_hash_entropy_Y'] = \
                 hashing_utils.hash_entropy(Y_val_output > 0)
-            epoch_result[name + '_objective'] = in_mean/out_mean
+            epoch_result[name + '_objective'] = np.sum(
+                in_dist*np.log(in_dist + 1e-100)/np.log(out_dist + 1e-100))
 
             if epoch_result['validate_cost'] < current_validate_cost:
                 patience_cost = improvement_threshold*current_validate_cost
