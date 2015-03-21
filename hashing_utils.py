@@ -7,47 +7,32 @@ import theano
 import scipy.spatial
 import pickle
 import lasagne
+import lasagne.layers.dnn
 import collections
-
-
-def shingle(x, stacks):
-    ''' Shingles a matrix column-wise
-
-    :parameters:
-        - x : np.ndarray
-            Matrix to shingle
-        - stacks : int
-            Number of copies of each column to stack
-
-    :returns:
-        - x_shingled : np.ndarray
-            X with columns stacked
-    '''
-    return np.hstack([x[n:(x.shape[0] - stacks + n)]
-                      for n in xrange(stacks)])
 
 
 def standardize(X):
     ''' Return column vectors to standardize X, via (X - X_mean)/X_std
 
     :parameters:
-        - X : np.ndarray, shape=(n_examples, n_features)
+        - X : np.ndarray, shape=(n_filters, n_examples, n_features)
             Data matrix
 
     :returns:
-        - X_mean : np.ndarray, shape=(n_features, 1)
+        - X_mean : np.ndarray, shape=(n_filters, 1, n_features)
             Mean column vector
-        - X_std : np.ndarray, shape=(n_features, 1)
+        - X_std : np.ndarray, shape=(n_filters, 1, n_features)
             Standard deviation column vector
     '''
-    std = np.std(X, axis=0)
-    return np.mean(X, axis=0), std + (std == 0)
+    std = np.std(X, axis=1)
+    return (np.mean(X, axis=1).reshape(X.shape[0], 1, X.shape[2]),
+            (std + (std == 0)).reshape(X.shape[0], 1, X.shape[2]))
 
 
-def load_data(train_list, valid_list, shingle_size=4):
+def load_data(train_list, valid_list):
     '''
     Load in dataset given lists of files in each split.
-    Also shindles and standardizes (using train mean/std) the data.
+    Also standardizes (using train mean/std) the data.
     Each file should be a .npz file with a key 'X' for data in the X modality
     and 'Y' for data in the Y modality.
 
@@ -56,8 +41,6 @@ def load_data(train_list, valid_list, shingle_size=4):
             List of paths to files in the training set.
         - valid_list : list of str
             List of paths to files in the validation set.
-        - shingle_size : int
-            Number of entries to shingle.
 
     :returns:
         - X_train : list
@@ -78,34 +61,67 @@ def load_data(train_list, valid_list, shingle_size=4):
         for filename in file_list:
             data = np.load(filename)
             # Shingle and convert to floatX with correct column order
-            X[key].append(np.array(shingle(data['X'], shingle_size),
-                                   dtype=theano.config.floatX, order='C'))
-            Y[key].append(np.array(shingle(data['Y'], shingle_size),
-                                   dtype=theano.config.floatX, order='C'))
-        # Stack all examples into big matrix
-        X[key] = np.vstack(X[key])
-        Y[key] = np.vstack(Y[key])
+            X[key].append(np.array(
+                data['X'], dtype=theano.config.floatX, order='C'))
+            Y[key].append(np.array(
+                data['Y'], dtype=theano.config.floatX, order='C'))
         # Get mean/std for training set
         if key == 'train':
-            X_mean, X_std = standardize(X[key])
-            Y_mean, Y_std = standardize(Y[key])
+            X_mean, X_std = standardize(np.concatenate(X[key], axis=1))
+            Y_mean, Y_std = standardize(np.concatenate(Y[key], axis=1))
         # Use training set mean/std to standardize
-        X[key] = (X[key] - X_mean)/X_std
-        Y[key] = (Y[key] - Y_mean)/Y_std
+        X[key] = [(x - X_mean)/X_std for x in X[key]]
+        Y[key] = [(y - Y_mean)/Y_std for y in Y[key]]
 
     return X['train'], Y['train'], X['valid'], Y['valid']
 
 
-def get_next_batch(X, Y, batch_size, n_iter):
+def sample_sequences(X, Y, sample_size):
+    ''' Given lists of sequences, crop out sequences of length sample_size
+    from each sequence with a random offset
+
+    :parameters:
+        - X, Y : list of np.ndarray
+            List of X/Y sequence matrices, each with shape (n_channels,
+            n_time_steps, n_features)
+        - sample_size : int
+            The size of the cropped samples from the sequences
+
+    :returns:
+        - X_sampled, Y_sampled : np.ndarray
+            X/Y sampled sequences, shape (n_samples, n_channels, n_time_steps,
+            n_features)
+    '''
+    X_sampled = []
+    Y_sampled = []
+    for sequence_X, sequence_Y in zip(X, Y):
+        # Ignore sequences which are too short
+        if sequence_X.shape[1] < sample_size:
+            continue
+        # Compute a random offset to start cropping from
+        offset = np.random.randint(0, sequence_X.shape[1] % sample_size + 1)
+        # Extract samples of this sequence at offset, offset + sample_size,
+        # offset + 2*sample_size ... until the end of the sequence
+        X_sampled += [sequence_X[:, o:o + sample_size] for o in
+                      np.arange(offset, sequence_X.shape[1] - sample_size + 1,
+                                sample_size)]
+        Y_sampled += [sequence_Y[:, o:o + sample_size] for o in
+                      np.arange(offset, sequence_Y.shape[1] - sample_size + 1,
+                                sample_size)]
+    # Combine into new output array
+    return np.array(X_sampled), np.array(Y_sampled)
+
+
+def get_next_batch(X, Y, batch_size, sample_size, n_iter):
     ''' Randomly generates positive and negative example minibatches
 
     :parameters:
-        - X : np.ndarray, shape=(n_examples, n_features)
-            Data matrix in one modality
-        - y : np.ndarray, shape=(n_examples, n_features)
-            Data matrix in another modality
+        - X, Y : list of np.ndarray
+            List of data matrices in each modality
         - batch_size : int
             Size of each minibatch to grab
+        - sample_size : int
+            Size of each sampled sequence
         - n_iter : int
             Total number of iterations to run
 
@@ -119,19 +135,22 @@ def get_next_batch(X, Y, batch_size, n_iter):
         - Y_n : np.ndarray
             Negative example minibatch in Y modality
     '''
-    N = X.shape[0]
-    n_batches = int(np.floor(N/float(batch_size)))
-    current_batch = n_batches
+    # These are dummy values which will force the sequences to be sampled
+    current_batch = 1
+    # We'll only know the number of batches after we sample sequences
+    n_batches = 0
     for n in xrange(n_iter):
         if current_batch >= n_batches:
+            X_sampled, Y_sampled = sample_sequences(X, Y, sample_size)
+            N = X_sampled.shape[0]
+            n_batches = int(np.floor(N/float(batch_size)))
+            # Shuffle X_p and Y_p the same; suffle X_n and Y_n differently
             positive_shuffle = np.random.permutation(N)
             negative_shuffle = np.random.permutation(N)
-            X_p = np.array(X[positive_shuffle])
-            Y_p = np.array(Y[positive_shuffle])
-            # X_n = np.array(X[:, np.mod(negative_shuffle +
-            #                            2*np.random.randint(0, 2, N) - 1, N)])
-            X_n = np.array(X[np.random.permutation(N)])
-            Y_n = np.array(Y[negative_shuffle])
+            X_p = np.array(X_sampled[positive_shuffle])
+            Y_p = np.array(Y_sampled[positive_shuffle])
+            X_n = np.array(X_sampled[np.random.permutation(N)])
+            Y_n = np.array(Y_sampled[negative_shuffle])
             current_batch = 0
         batch = slice(current_batch*batch_size, (current_batch + 1)*batch_size)
         yield X_p[batch], Y_p[batch], X_n[batch], Y_n[batch]
@@ -216,6 +235,68 @@ def mean_reciprocal_rank(X, Y, indices):
             np.mean(1./(n_lt.sum(axis=0) + 1)))
 
 
+def build_network(input_shape, num_filters, filter_size, ds,
+                  hidden_layer_sizes, dropout, n_bits):
+    '''
+    Construct a list of layers of a network given the network's structure.
+
+    :parameters:
+        - input_shape : tuple
+            In what shape will data be supplied to the network?
+        - num_filters : list
+            Number of features in each convolutional layer
+        - filter_size : list
+            Number of features in each convolutional layer
+        - ds : dict of list
+            Number of features in each convolutional layer
+        - hidden_layer_sizes : list
+            Size of each hidden layer
+        - dropout : bool
+            Should dropout be applied between fully-connected layers?
+        - n_bits : int
+            Output dimensionality
+
+    :returns:
+        - layers : list
+            List of layer instances for this network.
+    '''
+    layers = [lasagne.layers.InputLayer(shape=input_shape)]
+    # Add each convolutional and pooling layer recursively
+    for n in xrange(len(num_filters)):
+        # We will initialize weights to \sqrt{2/n_l}
+        n_l = num_filters[n]*np.prod(filter_size[n])
+        layers.append(lasagne.layers.dnn.Conv2DDNNLayer(
+            layers[-1], num_filters=num_filters[n],
+            filter_size=filter_size[n],
+            nonlinearity=lasagne.nonlinearities.rectify,
+            W=lasagne.init.Normal(np.sqrt(2./n_l))))
+        layers.append(lasagne.layers.dnn.MaxPool2DDNNLayer(
+            layers[-1], ds[n]))
+    # A dense layer will treat any dimensions after the first as feature
+    # dimensions, but the third dimension is really a timestep dimension.
+    # We can only squash adjacent dimensions with a ReshapeLayer, so we
+    # need to place the time stpe dimension after the batch dimension
+    layers.append(lasagne.layers.DimshuffleLayer(
+        layers[-1], (0, 2, 1, 3)))
+    conv_output_shape = layers[-1].get_output_shape()
+    # Reshape to (n_batch*n_time_steps, n_conv_output_features)
+    layers.append(lasagne.layers.ReshapeLayer(
+        layers[-1], (-1, conv_output_shape[2]*conv_output_shape[3])))
+    # Add dense hidden layers and optionally dropout
+    for hidden_layer_size in hidden_layer_sizes:
+        layers.append(lasagne.layers.DenseLayer(
+            layers[-1], num_units=hidden_layer_size,
+            nonlinearity=lasagne.nonlinearities.rectify))
+        if dropout:
+            layers.append(lasagne.layers.DropoutLayer(layers[-1]))
+    # Add output layer
+    layers.append(lasagne.layers.DenseLayer(
+        layers[-1], num_units=n_bits,
+        nonlinearity=lasagne.nonlinearities.tanh))
+
+    return layers
+
+
 def save_model(param_list, output_file):
     '''
     Write out a pickle file of a hashing network
@@ -230,32 +311,16 @@ def save_model(param_list, output_file):
         pickle.dump(param_list, f)
 
 
-def load_model(param_list, batch_size):
+def load_model(layers, param_file):
     '''
-    Create a hashing network based on a list of per-layer parameters
+    Load in the parameters from a pkl file into a model
 
     :parameters:
-        - param_list : list of np.ndarray
-            A list of values, per layer, of the parameters of the network
-        - batch_size : int
-            The input batch size, which cannot be inferred from the parameter
-            shapes
-
-    :returns:
-        - layers : list of lasagne.layers.Layer
-            List of all layers in the network
+        - layers : list
+            A list of layers which define the model
+        - param_file : str
+            Pickle file of model parameters to load
     '''
-    # Layers in the hashing network
-    layers = []
-    # Start with input layer
-    layers.append(lasagne.layers.InputLayer(
-        shape=(batch_size, param_list[-2].shape[0])))
-    # Add each hidden layer recursively
-    for W, b in zip(param_list[-2::-2], param_list[::-2]):
-        layers.append(lasagne.layers.DenseLayer(
-            layers[-1], num_units=W.shape[1],
-            nonlinearity=lasagne.nonlinearities.tanh))
-        # Set the param value according to the input
-        layers[-1].W.set_value(W.astype(theano.config.floatX))
-        layers[-1].b.set_value(b.astype(theano.config.floatX))
-    return layers
+    with open(param_file) as f:
+        params = pickle.load(f)
+    lasagne.layers.set_all_param_values(layers[-1], params)

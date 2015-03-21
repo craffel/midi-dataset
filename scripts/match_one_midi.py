@@ -8,13 +8,14 @@ import cPickle as pickle
 import pretty_midi
 import hashing_utils
 import theano
-import theano.tensor as T
 import hash_match
 import numpy as np
 import time
 import argparse
 import unicodedata
 import tabulate
+from network_structure import (hidden_layer_sizes, num_filters, filter_size,
+                               ds, n_bits, dropout)
 
 print "Loading in MSD data ..."
 # Load in all hashed MSD sequences
@@ -36,14 +37,12 @@ sequences = [d['hash_list'] for d in data]
 lengths = lengths[sorted_idx]
 
 print "Loading in hasher ..."
-# Load in the MIDI hasher
-with open('../results/model_X.pkl') as f:
-    hasher_params = pickle.load(f)
-hasher_layers = hashing_utils.load_model(hasher_params, 100)
-# Create a function for hashing a piano roll
-hasher_input = T.matrix('hasher_input')
-hash = theano.function([hasher_input], hasher_layers[-1].get_output(
-    hasher_input, deterministic=True))
+layers = hashing_utils.build_network(
+    (None, 1, 100, 48), num_filters['X'], filter_size['X'], ds['X'],
+    hidden_layer_sizes['X'], dropout, n_bits)
+hashing_utils.load_model(layers, '../results/model_X.pkl')
+hash = theano.function(
+    [layers[0].input_var], layers[-1].get_output(deterministic=True))
 
 
 def match_one_midi(midi_file):
@@ -56,12 +55,13 @@ def match_one_midi(midi_file):
     '''
     # Get a beat-synchronous piano roll of the MIDI
     pm = pretty_midi.PrettyMIDI(midi_file)
-    piano_roll = pm.get_piano_roll(times=pm.get_beats())[36:84, :].T
+    piano_roll = pm.get_piano_roll(times=pm.get_beats()).T
+    piano_roll = piano_roll[np.newaxis, :, 36:84]
     # Make the piano roll look like it does when we trained the hasher
-    piano_roll = hashing_utils.shingle(piano_roll, 4)
     mean, std = hashing_utils.standardize(piano_roll)
     piano_roll = (piano_roll - mean)/std
-    hashed_piano_roll = hash(piano_roll.astype(theano.config.floatX))
+    hashed_piano_roll = hash(
+        piano_roll[np.newaxis].astype(theano.config.floatX))
     # Compute hash sequence
     query = hash_match.vectors_to_ints(hashed_piano_roll > 0)
     query = query.astype('uint16')
