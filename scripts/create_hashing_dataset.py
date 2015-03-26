@@ -48,7 +48,7 @@ for diagnostics_file in glob.glob(os.path.join(aligned_path, 'npz', '*.npz')):
         if beats.size == 0:
             continue
         # and beat-synchronous feature matrices
-        chroma = beat_aligned_feats.get_btchromas(h5)[:, time_mask].T
+        chroma = beat_aligned_feats.get_btchromas_loudness(h5)[:, time_mask].T
         timbre = beat_aligned_feats.get_bttimbre(h5)[:, time_mask].T
     # Stack it
     msd_features = np.array([chroma, timbre])

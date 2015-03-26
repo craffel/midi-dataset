@@ -55,7 +55,7 @@ def process_one_file(h5_file):
             if beats.size == 0:
                 return
             # and beat-synchronous feature matrices
-            chroma = beat_aligned_feats.get_btchromas(h5).T
+            chroma = beat_aligned_feats.get_btchromas_loudness(h5).T
             timbre = beat_aligned_feats.get_bttimbre(h5).T
         mean_chroma = chroma.mean(axis=0)
         msd_features = np.array([chroma, timbre])
