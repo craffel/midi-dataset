@@ -194,95 +194,59 @@ def get_btloudnessmax(h5):
     return btloudnessmax
 
 
-def align_feats(feats, segstarts, btstarts, duration):
-    """
-    MAIN FUNCTION: aligned whatever matrix of features is passed,
-    one column per segment, and interpolate them to get features
-    per beat.
-    Note that btstarts could be anything, e.g. bar starts
-    INPUT
-       feats      - matrix of features, one column per segment
-       segstarts  - segments starts in seconds,
-                    dim must match feats # cols (flatten ndarray)
-       btstarts   - beat starts in seconds (flatten ndarray)
-       duration   - overall track duration in seconds
-    RETURN
-       btfeats    - features, one column per beat
-                    None if there is a problem
-    """
-    # sanity check
-    if feats.shape[0] == 0 or feats.shape[1] == 0:
-        return None
-    if btstarts.shape[0] == 0 or segstarts.shape[0] == 0:
-        return None
+def align_feats(values, times, new_times, duration):
+    '''
+    Perform soft mean aggregation of `values` over the intervals in `new_times`
+    If any of `new_times` falls outside of the limit of `times`,
+    the edge values are used.
 
-    # FEAT PER BEAT
-    # Move segment feature onto a regular grid
-    # result for track: 'TR0002Q11C3FA8332D'
-    #    warpmat.shape = (304, 708)
-    #    btchroma.shape = (304, 12)
-    warpmat = get_time_warp_matrix(segstarts, btstarts, duration)
-    featchroma = np.dot(warpmat, feats.T).T
-    if featchroma.shape[1] == 0: # sanity check
-        return None
+    Parameters
+    ----------
 
-    # done
-    return featchroma
+    values : np.ndarray [shape=(n_features, n_time_steps - 1)]
+        `values[n]` is the feature vector from `times[n]` to `times[n + 1]`
 
+    times : np.ndarray [shape=(n_time_steps,)]
+        Time boundaries of the original values
 
-def get_time_warp_matrix(segstart, btstart, duration):
-    """
-    Used by create_beat_synchro_chromagram
-    Returns a matrix (#beats,#segs)
-    #segs should be larger than #beats, i.e. many events or segs
-    happen in one beat.
-    THIS FUNCTION WAS ORIGINALLY CREATED BY RON J. WEISS (Columbia/NYU/Google)
-    """
-    # length of beats and segments in seconds
-    # result for track: 'TR0002Q11C3FA8332D'
-    #    seglen.shape = (708,)
-    #    btlen.shape = (304,)
-    #    duration = 238.91546    meaning approx. 3min59s
-    seglen = np.concatenate((segstart[1:], [duration])) - segstart
-    btlen = np.concatenate((btstart[1:], [duration])) - btstart
+    new_times : np.ndarray [shape=(n_new_time_steps,)]
+        Intervals over which to aggregate `values`
 
-    warpmat = np.zeros((len(segstart), len(btstart)))
-    # iterate over beats (columns of warpmat)
-    for n in xrange(len(btstart)):
-        # beat start time and end time in seconds
-        start = btstart[n]
-        end = start + btlen[n]
-        # np.nonzero returns index of nonzero elems
-        # find first segment that starts after beat starts - 1
-        try:
-            start_idx = np.nonzero((segstart - start) >= 0)[0][0] - 1
-        except IndexError:
-            # no segment start after that beats, can happen close
-            # to the end, simply ignore, maybe even break?
-            # (catching faster than ckecking... it happens rarely?)
-            break
-        # find first segment that starts after beat ends
-        segs_after = np.nonzero((segstart - end) >= 0)[0]
-        if segs_after.shape[0] == 0:
-            end_idx = start_idx
-        else:
-            end_idx = segs_after[0]
-        # fill col of warpmat with 1 for the elem in between
-        # (including start_idx, excluding end_idx)
-        warpmat[start_idx:end_idx, n] = 1.
-        # if the beat started after the segment, keep the proportion
-        # of the segment that is inside the beat
-        warpmat[start_idx, n] = 1. - ((start - segstart[start_idx])
-                                 / seglen[start_idx])
-        # if the segment ended after the beat ended, keep the proportion
-        # of the segment that is inside the beat
-        if end_idx - 1 > start_idx:
-            warpmat[end_idx-1, n] = ((end - segstart[end_idx-1])
-                                     / seglen[end_idx-1])
-        # normalize so the 'energy' for one beat is one
-        warpmat[:, n] /= np.sum(warpmat[:, n])
-    # return the transpose, meaning (#beats , #segs)
-    return warpmat.T
+    Returns
+    -------
+
+    new_values : np.ndarray [shape=(n_features, n_new_time_steps - 1)]
+        `values` aggregated over `new_times`
+    '''
+    times = np.append(times, duration)
+    new_times = np.append(new_times, duration)
+    # Adjust times to span new_times, effectively using edge values
+    if new_times[0] < times[0]:
+        times[0] = new_times[0]
+    if new_times[-1] > times[-1]:
+        times[-1] = new_times[-1]
+    # Find the first time after each new_time
+    first_after = np.argmax(np.less.outer(new_times, times), axis=1)
+    # Find the first time before each new_time
+    last_before = first_after - 1
+    # Add the new times to the list of times
+    times = np.append(times[:-1], new_times)
+    # Add the values at the new times into values
+    values = np.hstack([values, values[:, last_before]])
+    # Re-sort times with the new times
+    time_sort = np.argsort(times)
+    times = times[time_sort]
+    # apply the same sorting to the values
+    values = values[:, time_sort]
+    # Find the indices of times equal to the new times
+    equal_idx = np.argmax(np.equal.outer(new_times, times), axis=1)
+    # Compute interval lengths
+    lengths = np.diff(times)
+    new_lengths = np.diff(new_times)
+    # Aggregate over all new time intervals
+    return np.array([(lengths[a:b]*values[:, a:b]/new_lengths[n]).sum(axis=1)
+                     for n, (a, b)
+                     in enumerate(zip(equal_idx[:-1], equal_idx[1:]))]).T
 
 
 def idB(loudness_array):
