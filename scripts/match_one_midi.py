@@ -20,7 +20,7 @@ from network_structure import (hidden_layer_sizes, num_filters, filter_size,
 print "Loading in MSD data ..."
 # Load in all hashed MSD sequences
 data = []
-for pkl_file in glob.glob('../data/msd/pkl_uspop2002/*/*/*.pkl'):
+for pkl_file in glob.glob('../data/msd/pkl/*/*/*/*.pkl'):
     with open(pkl_file) as f:
         try:
             data.append(pickle.load(f))
@@ -44,6 +44,10 @@ hashing_utils.load_model(layers, '../results/model_X.pkl')
 hash = theano.function(
     [layers[0].input_var], layers[-1].get_output(deterministic=True))
 
+# Load in training set statistics for standardization
+with open('../results/X_mean_std.pkl') as f:
+    train_stats = pickle.load(f)
+
 
 def match_one_midi(midi_file):
     '''
@@ -58,8 +62,7 @@ def match_one_midi(midi_file):
     piano_roll = pm.get_piano_roll(times=pm.get_beats()).T
     piano_roll = piano_roll[np.newaxis, :, 36:84]
     # Make the piano roll look like it does when we trained the hasher
-    mean, std = hashing_utils.standardize(piano_roll)
-    piano_roll = (piano_roll - mean)/std
+    piano_roll = (piano_roll - train_stats['mean'])/train_stats['std']
     hashed_piano_roll = hash(
         piano_roll[np.newaxis].astype(theano.config.floatX))
     # Compute hash sequence

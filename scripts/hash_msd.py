@@ -32,6 +32,10 @@ hash = theano.function(
 
 h5_glob = os.path.join(BASE_DATA_PATH, 'msd', 'h5', '*', '*', '*', '*.h5')
 
+# Load in training set statistics for standardization
+with open('../results/Y_mean_std.pkl') as f:
+    train_stats = pickle.load(f)
+
 
 def process_one_file(h5_file):
     '''
@@ -61,8 +65,7 @@ def process_one_file(h5_file):
         msd_features = np.array([chroma, timbre])
         if msd_features.shape[1] < 5:
             return
-        mean, std = hashing_utils.standardize(msd_features)
-        msd_features = (msd_features - mean)/std
+        msd_features = (msd_features - train_stats['mean'])/train_stats['std']
         if np.isnan(msd_features).any():
             return
         hashed_features = hash(
