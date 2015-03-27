@@ -61,46 +61,25 @@ def int_dist(x, y, output, bits_set=bits_set):
             output[m, n] = bits_set[x[m] ^ y[n]]
 
 
-@numba.jit('void(u2[:, :], u2, u2[:, :], u2)',
+@numba.jit('void(u2[:, :], u2, u2[:, :])',
            locals={'i': numba.uint16,
-                   'j': numba.uint16,
-                   'start': numba.int16,
-                   'end': numba.int16,
-                   'gully_x': numba.uint16,
-                   'gully_y': numba.uint16,
-                   'compute_end': numba.boolean},
+                   'j': numba.uint16},
            nopython=True)
-def dtw_core(D, pen, phi, gully):
-    gully_x = gully
-    gully_y = gully
-    if D.shape[0] > D.shape[1]:
-        gully_y += D.shape[0] - D.shape[1]
-    if D.shape[1] > D.shape[0]:
-        gully_x += D.shape[1] - D.shape[0]
+def dtw_core(D, pen, phi):
+    '''
+    Core dynamic programming routine for dynamic time warping.
+
+    :parameters:
+        - D : np.ndarray, dtype='uint16'
+            Distance matrix
+        - pen : int
+            Non-diagonal move penalty
+        - phi : np.ndarray, dtype='uint16'
+            Pre-allocated traceback matrix
+    '''
     # At each loop iteration, we are computing lowest cost to D[i + 1, j + 1]
     for i in xrange(D.shape[0] - 1):
-        start = i - gully_y
-        if start < 0:
-            start = 0
-        end = i + gully_x + 1
-        if end > D.shape[1] - 1:
-            end = D.shape[1] - 1
-
-        if start >= 0:
-            if D[i, start] <= D[i, start + 1] + pen:
-                phi[i + 1, start + 1] = 0
-                D[i + 1, start + 1] += D[i, start]
-            else:
-                phi[i + 1, start + 1] = 1
-                D[i + 1, start + 1] += D[i, start + 1] + pen
-            start += 1
-
-        compute_end = False
-        if end <= D.shape[1] - 1:
-            end -= 1
-            compute_end = True
-
-        for j in xrange(start, end):
+        for j in xrange(D.shape[1] - 1):
             # Diagonal move (which has no penalty) is lowest
             if D[i, j] <= D[i, j + 1] + pen and D[i, j] <= D[i + 1, j] + pen:
                 phi[i + 1, j + 1] = 0
@@ -113,14 +92,6 @@ def dtw_core(D, pen, phi, gully):
             elif D[i + 1, j] <= D[i, j + 1] and D[i + 1, j] + pen <= D[i, j]:
                 phi[i + 1, j + 1] = 2
                 D[i + 1, j + 1] += D[i + 1, j] + pen
-
-        if compute_end:
-            if D[i, end] <= D[i + 1, end] + pen:
-                phi[i + 1, end + 1] = 0
-                D[i + 1, end + 1] += D[i, j]
-            else:
-                phi[i + 1, end + 1] = 2
-                D[i + 1, end + 1] += D[i + 1, end] + pen
 
 
 def dtw(distance_matrix, gully, penalty):
@@ -143,10 +114,10 @@ def dtw(distance_matrix, gully, penalty):
     '''
     # Pre-allocate traceback matrix
     phi = np.empty(distance_matrix.shape, distance_matrix.dtype)
+    # Populate distance matrix with lowest cost path
+    dtw_core(distance_matrix, penalty, phi)
     # Traceback from lowest-cost point on bottom or right edge
     gully = int(gully*min(distance_matrix.shape[0], distance_matrix.shape[1]))
-    # Populate distance matrix with lowest cost path
-    dtw_core(distance_matrix, penalty, phi, gully)
     i = np.argmin(distance_matrix[gully:, -1]) + gully
     j = np.argmin(distance_matrix[-1, gully:]) + gully
 
