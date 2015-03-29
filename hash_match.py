@@ -14,6 +14,22 @@ for i in xrange(2**N_BITS):
     bits_set[i] = (i & 1) + bits_set[i/2]
 
 
+def ints_to_vectors(int_sequence):
+    '''
+    Convert a sequence of integers into bit vector arrays
+
+    :parameters:
+        - int_sequence : np.ndarray, dtype=np.int
+            Sequence of integers
+
+    :returns:
+        - vectors : np.ndarray, dtype=np.bool
+            Matrix of bit vectors, shape (len(int_sequence), N_BITS)
+    '''
+    return np.array([[n >> i & 1 for i in range(N_BITS)]
+                     for n in int_sequence])
+
+
 def vectors_to_ints(vectors):
     '''
     Turn a matrix of bit vector arrays into a vector of ints
