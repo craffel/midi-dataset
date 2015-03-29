@@ -81,7 +81,7 @@ def int_dist(x, y, output, bits_set=bits_set):
            locals={'i': numba.uint16,
                    'j': numba.uint16},
            nopython=True)
-def dtw_core(D, pen, phi):
+def dtw_core(D, pen, path_length):
     '''
     Core dynamic programming routine for dynamic time warping.
 
@@ -90,7 +90,7 @@ def dtw_core(D, pen, phi):
             Distance matrix
         - pen : int
             Non-diagonal move penalty
-        - phi : np.ndarray, dtype='uint16'
+        - path_length : np.ndarray, dtype='uint16'
             Pre-allocated traceback matrix
     '''
     # At each loop iteration, we are computing lowest cost to D[i + 1, j + 1]
@@ -98,15 +98,15 @@ def dtw_core(D, pen, phi):
         for j in xrange(D.shape[1] - 1):
             # Diagonal move (which has no penalty) is lowest
             if D[i, j] <= D[i, j + 1] + pen and D[i, j] <= D[i + 1, j] + pen:
-                phi[i + 1, j + 1] = 0
+                path_length[i + 1, j + 1] += path_length[i, j] + 1
                 D[i + 1, j + 1] += D[i, j]
             # Horizontal move (has penalty)
             elif D[i, j + 1] <= D[i + 1, j] and D[i, j + 1] + pen <= D[i, j]:
-                phi[i + 1, j + 1] = 1
+                path_length[i + 1, j + 1] += path_length[i, j + 1] + 1
                 D[i + 1, j + 1] += D[i, j + 1] + pen
             # Vertical move (has penalty)
             elif D[i + 1, j] <= D[i, j + 1] and D[i + 1, j] + pen <= D[i, j]:
-                phi[i + 1, j + 1] = 2
+                path_length[i + 1, j + 1] += path_length[i + 1, j] + 1
                 D[i + 1, j + 1] += D[i + 1, j] + pen
 
 
@@ -129,9 +129,9 @@ def dtw(distance_matrix, gully, penalty):
             DTW score of lowest cost path through the distance matrix.
     '''
     # Pre-allocate traceback matrix
-    phi = np.empty(distance_matrix.shape, distance_matrix.dtype)
+    path_length = np.zeros(distance_matrix.shape, distance_matrix.dtype)
     # Populate distance matrix with lowest cost path
-    dtw_core(distance_matrix, penalty, phi)
+    dtw_core(distance_matrix, penalty, path_length)
     # Traceback from lowest-cost point on bottom or right edge
     gully = int(gully*min(distance_matrix.shape[0], distance_matrix.shape[1]))
     i = np.argmin(distance_matrix[gully:, -1]) + gully
@@ -143,26 +143,7 @@ def dtw(distance_matrix, gully, penalty):
         i = distance_matrix.shape[0] - 1
 
     # Score is the final score of the best path
-    score = distance_matrix[i, j]
-
-    # Normalize by path length
-    N = 0.
-    # Until we reach an edge
-    while i > 0 and j > 0:
-        # If the tracback matrix indicates a diagonal move...
-        if phi[i, j] == 0:
-            i = i - 1
-            j = j - 1
-        # Horizontal move...
-        elif phi[i, j] == 1:
-            i = i - 1
-        # Vertical move...
-        elif phi[i, j] == 2:
-            j = j - 1
-        N += 1
-
-    # Normalize score
-    score = score/N
+    score = distance_matrix[i, j]/float(path_length[i, j])
 
     return score
 
