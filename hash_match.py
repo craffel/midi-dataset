@@ -3,7 +3,6 @@ Functions for matching hash sequences quickly
 '''
 import numpy as np
 import numba
-import scipy.ndimage
 
 N_BITS = 16
 
@@ -148,81 +147,23 @@ def dtw(distance_matrix, gully, penalty):
     return score
 
 
-def keogh_envelopes(x, r):
-    '''
-    Compute the LB_keogh upper/lower (sliding min/max) envelopes for a sequence
-
-    :parameters:
-        - x : np.ndarray
-            Sequence
-        - r : int
-            Radius over which to compute the bounds
-
-    :returns:
-        - u : np.ndarray
-            Upper envelope
-        - l : np.ndarray
-            Lower envelope
-    '''
-    u = scipy.ndimage.filters.maximum_filter1d(x, r).astype(np.uint16)
-    l = scipy.ndimage.filters.minimum_filter1d(x, r).astype(np.uint16)
-    return u, l
-
-
-def lb_keogh(u, l, y, bits_set=bits_set):
-    '''
-    Compute Keogh lower bound for DTW cost
-
-    :parameters:
-        - u : np.ndarray, dtype='uint16'
-            Upper sequence envelope
-        - l : np.ndarray, dtype='uint16'
-            Lower sequence envelope
-        - y : np.ndarray, dtype='uint16'
-            Sequence to compare to
-        - bits_set : np.ndarray, dtype='uint16'
-            Table where bits_set(x) is the number of 1s in the binary
-            representation of x, where x is an unsigned 16 bit int
-
-    :returns:
-        - lower_bound : float
-            Keogh lower DTW bound
-    '''
-    # Trim longer of u, l/y to shorter length
-    if y.shape[0] > u.shape[0]:
-        y = y[:u.shape[0]]
-    else:
-        u = u[:y.shape[0]]
-        l = l[:y.shape[0]]
-    # Compute LB Keogh bound
-    bound = np.sum(bits_set[(y ^ u)[y > u]]) + np.sum(bits_set[(y ^ l)[y < l]])
-    # We need to normalize by sequence length because we do the same for DTW
-    return bound/float(u.shape[0])
-
-
-def match_one_sequence(query, query_length, sequences, lengths,
-                       length_tolerance, radius, gully, penalty):
+def match_one_sequence(query, sequences, gully, penalty,
+                       sequence_indices=None):
     '''
     Match a query sequence to one of the sequences in a list
 
     :parameters:
         - query : np.ndarray, dtype='uint16'
             Query sequence
-        - query_length : float
-            The length of the query.
         - sequences : list of np.ndarray, dtype='uint16'
             Sequences to find matches in, sorted by sequence length
-        - lengths : list of int
-            Sequence lengths, _in sorted order_
-        - length_tolerance : float
-            In order to check a sequence against the query, its length must be
-            within +/- list_tolerance percentage of query length
-        - radius : int
-            Keogh lower bound envelope radius
         - gully : float
             Sequences must match up to this porportion of shorter sequence
         - penalty : int
             DTW Non-diagonal move penalty
+        - sequence_indices : iterable or None
+            Iterable of the indices of entries of `sequences` which should be
+            matched against.  If `None`, match against all sequences.
 
     :returns:
         - matches : list of int
@@ -233,32 +174,19 @@ def match_one_sequence(query, query_length, sequences, lengths,
     # Pre-allocate match and score lists
     matches = []
     scores = []
-    # Save the best score so far for lower bounding
-    best_so_far = np.inf
-    # Find start and end of the range of sequences which are within
-    # length_tolerance percent of query length
-    start = np.searchsorted(lengths, (1 - length_tolerance)*query_length)
-    end = np.searchsorted(lengths,
-                          (1 + length_tolerance)*query_length,
-                          'right')
-    # Pre-compute Keogh upper and lower envelopes
-    u, l = keogh_envelopes(query, radius)
-    for n in xrange(start, end):
-        # Check Keogh lower bound
-        keogh_bound = lb_keogh(u, l, sequences[n])
-        if keogh_bound < best_so_far:
-            # Compute distance matrix
-            distance_matrix = np.empty(
-                (query.shape[0], sequences[n].shape[0]), dtype=np.uint16)
-            int_dist(query, sequences[n], distance_matrix, bits_set)
-            # Compute DTW distance
-            score = dtw(distance_matrix, gully, penalty)
-            # Store the score/match (even if it's not the best)
-            matches.append(n)
-            scores.append(score)
-            # Update the best score so far
-            if score < best_so_far:
-                best_so_far = score
+    # Default: Check all sequences
+    if sequence_indices is None:
+        sequence_indices = xrange(len(sequences))
+    for n in sequence_indices:
+        # Compute distance matrix
+        distance_matrix = np.empty(
+            (query.shape[0], sequences[n].shape[0]), dtype=np.uint16)
+        int_dist(query, sequences[n], distance_matrix, bits_set)
+        # Compute DTW distance
+        score = dtw(distance_matrix, gully, penalty)
+        # Store the score/match (even if it's not the best)
+        matches.append(n)
+        scores.append(score)
     # Sort the scores and matches
     sorted_idx = np.argsort(scores)
     matches = [matches[n] for n in sorted_idx]

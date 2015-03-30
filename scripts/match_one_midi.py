@@ -27,14 +27,8 @@ for pkl_file in glob.glob('../data/msd/pkl/*/*/*/*.pkl'):
         except:
             pass
 
-# Store sequence lengths
-lengths = np.array([d['duration'] for d in data])
-# Sort data by sequence length
-sorted_idx = np.argsort(lengths)
-data = [data[n] for n in sorted_idx]
 # Create a separate list of the sequences
 sequences = [d['hash_list'] for d in data]
-lengths = lengths[sorted_idx]
 
 print "Loading in hasher ..."
 layers = hashing_utils.build_network(
@@ -70,7 +64,7 @@ def match_one_midi(midi_file):
     query = query.astype('uint16')
     # Match the MIDI file query hash list against all sequences
     matches, scores = hash_match.match_one_sequence(
-        query, pm.get_end_time(), sequences, lengths, .05, 25, .95, 8)
+        query, sequences, .95, 8)
     return matches, scores
 
 clean = lambda string : unicodedata.normalize(
