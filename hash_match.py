@@ -3,6 +3,7 @@ Functions for matching hash sequences quickly
 '''
 import numpy as np
 import numba
+import scipy.spatial.distance
 
 N_BITS = 16
 
@@ -145,6 +146,58 @@ def dtw(distance_matrix, gully, penalty):
     score = distance_matrix[i, j]/float(path_length[i, j])
 
     return score
+
+
+def filter_by_length(query, sequences, tolerance):
+    '''
+    Given a query sequence, a list of sequences, and a tolerance, return the
+    indices n of sequences where
+    tolerance*len(query) < len(sequences[n]) < len(query)/tolerance
+
+    :parameters:
+        - query : np.ndarray
+            Query sequence
+        - sequences : list of np.ndarray
+            List of sequences to be matched
+        - tolerance : float
+            Sequence length tolerance, in [0, 1]
+
+    :returns:
+        - valid_indices : np.ndarray, dtype=int
+            Indices of sequences which satisfy the length range
+    '''
+    # When tolerance is 0, use range [0, np.inf]
+    if tolerance == 0:
+        inv_tolerance = np.inf
+    else:
+        inv_tolerance = 1./tolerance
+    return [n for n, seq in enumerate(sequences)
+            if tolerance*len(query) < len(seq)
+            and inv_tolerance*len(query) > len(seq)]
+
+
+def filter_by_mean_chroma(query_chroma, mean_chromas, percentile):
+    '''
+    Get the indices of MSD entries whose distance from the supplied MIDI mean
+    chroma vector is within the supplied percentile
+
+    :parameters:
+        - query_chroma : np.ndarray, shape=(12,)
+            Mean chroma vector of a MIDI file
+        - mean_chromas : np.ndarray, shape=(n_examples, 12)
+            Collection of mean chroma vectors for MSD entries
+        - percentile : int
+            Only return indices of MSD entries whose distance to the MIDI
+            chroma vector is above this percentile
+
+    :returns:
+        - valid_indices : np.ndarray, dtype=int
+            Indices of sequences which satisfy the above constraint
+    '''
+    chroma_dists = scipy.spatial.distance.cdist(
+        query_chroma[np.newaxis], mean_chromas, 'cosine').flatten()
+    dist_threshold = np.percentile(chroma_dists, percentile)
+    return np.flatnonzero(chroma_dists < dist_threshold)
 
 
 def match_one_sequence(query, sequences, gully, penalty,

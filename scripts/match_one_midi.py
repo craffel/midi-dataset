@@ -29,6 +29,8 @@ for pkl_file in glob.glob('../data/msd/pkl/*/*/*/*.pkl'):
 
 # Create a separate list of the sequences
 sequences = [d['hash_list'] for d in data]
+# And mean chroma vectors
+mean_chromas = np.array([d['mean_chroma'] for d in data])
 
 print "Loading in hasher ..."
 layers = hashing_utils.build_network(
@@ -62,9 +64,18 @@ def match_one_midi(midi_file):
     # Compute hash sequence
     query = hash_match.vectors_to_ints(hashed_piano_roll > 0)
     query = query.astype('uint16')
+    # Get indices of sequences which are within 40% -> 1/40% of this seq length
+    valid_length_indices = hash_match.filter_by_length(query, sequences, .4)
+    # Compute MIDI mean chroma vector
+    query_chroma = pm.get_chroma().mean(axis=1)
+    # Get sequences less than the mean chroma distance
+    valid_chroma_indices = hash_match.filter_by_mean_chroma(
+        query_chroma, mean_chromas, 50)
+    # Intersect to get valid index set
+    valid_indices = np.intersect1d(valid_length_indices, valid_chroma_indices)
     # Match the MIDI file query hash list against all sequences
     matches, scores = hash_match.match_one_sequence(
-        query, sequences, .95, 8)
+        query, sequences, .95, 8, valid_indices)
     return matches, scores
 
 clean = lambda string : unicodedata.normalize(
