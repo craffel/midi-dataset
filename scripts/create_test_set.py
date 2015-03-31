@@ -40,6 +40,9 @@ index = whoosh_search.get_whoosh_index(index_path)
 dev_set = []
 with index.searcher() as searcher:
     for entry in midis_in_datasets:
+        # If we've already added MSD entries for this MIDI, skip
+        if any(entry['md5'] == md5 for md5, _ in dev_set):
+            continue
         # Match each MIDI file entry against the MSD
         matches = whoosh_search.search(searcher, index.schema,
                                        entry['artist'],
