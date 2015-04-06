@@ -112,6 +112,35 @@ def sample_sequences(X, Y, sample_size):
     return np.array(X_sampled), np.array(Y_sampled)
 
 
+def random_derangement(n):
+    '''
+    Permute the numbers up to n such that no number remains in the same place
+
+    :parameters:
+        - n : int
+            Upper bound of numbers to permute from
+
+    :returns:
+        - v : np.ndarray, dtype=int
+            Derangement indices
+
+    :note:
+        From
+        http://stackoverflow.com/questions/26554211/numpy-shuffle-with-constraint
+    '''
+    while True:
+        v = np.arange(n)
+        for j in np.arange(n - 1, -1, -1):
+            p = np.random.randint(0, j+1)
+            if v[p] == j:
+                break
+            else:
+                v[j], v[p] = v[p], v[j]
+        else:
+            if v[0] != 0:
+                return v
+
+
 def get_next_batch(X, Y, batch_size, sample_size, n_iter):
     ''' Randomly generates positive and negative example minibatches
 
@@ -144,13 +173,15 @@ def get_next_batch(X, Y, batch_size, sample_size, n_iter):
             X_sampled, Y_sampled = sample_sequences(X, Y, sample_size)
             N = X_sampled.shape[0]
             n_batches = int(np.floor(N/float(batch_size)))
-            # Shuffle X_p and Y_p the same; suffle X_n and Y_n differently
+            # Shuffle X_p and Y_p the same
             positive_shuffle = np.random.permutation(N)
-            negative_shuffle = np.random.permutation(N)
             X_p = np.array(X_sampled[positive_shuffle])
             Y_p = np.array(Y_sampled[positive_shuffle])
-            X_n = np.array(X_sampled[np.random.permutation(N)])
-            Y_n = np.array(Y_sampled[negative_shuffle])
+            # Shuffle X_n and Y_n differently (derangement ensures nothing
+            # stays in the same place)
+            negative_shuffle = np.random.permutation(N)
+            X_n = np.array(X_sampled[negative_shuffle])
+            Y_n = np.array(Y_sampled[negative_shuffle][random_derangement(N)])
             current_batch = 0
         batch = slice(current_batch*batch_size, (current_batch + 1)*batch_size)
         yield X_p[batch], Y_p[batch], X_n[batch], Y_n[batch]
