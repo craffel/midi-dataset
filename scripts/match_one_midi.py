@@ -70,12 +70,12 @@ def match_one_midi(midi_file):
     query_chroma = pm.get_chroma().mean(axis=1)
     # Get sequences less than the mean chroma distance
     valid_chroma_indices = hash_match.filter_by_mean_chroma(
-        query_chroma, mean_chromas, 50)
+        query_chroma, mean_chromas, 20)
     # Intersect to get valid index set
     valid_indices = np.intersect1d(valid_length_indices, valid_chroma_indices)
     # Match the MIDI file query hash list against all sequences
     matches, scores = hash_match.match_one_sequence(
-        query, sequences, .95, 8, valid_indices)
+        query, sequences, .9, 4, valid_indices)
     return matches, scores
 
 clean = lambda string : unicodedata.normalize(
