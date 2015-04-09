@@ -297,10 +297,11 @@ def build_network(input_shape, num_filters, filter_size, ds,
         # We will initialize weights to \sqrt{2/n_l}
         n_l = num_filters[n]*np.prod(filter_size[n])
         layers.append(lasagne.layers.dnn.Conv2DDNNLayer(
-            layers[-1], num_filters=num_filters[n],
+            layers[-1], strides=(1, 1), num_filters=num_filters[n],
             filter_size=filter_size[n],
             nonlinearity=lasagne.nonlinearities.rectify,
-            W=lasagne.init.Normal(np.sqrt(2./n_l))))
+            W=lasagne.init.Normal(np.sqrt(2./n_l)),
+            border_mode='same'))
         layers.append(lasagne.layers.dnn.MaxPool2DDNNLayer(
             layers[-1], ds[n]))
     # A dense layer will treat any dimensions after the first as feature
@@ -319,7 +320,7 @@ def build_network(input_shape, num_filters, filter_size, ds,
             layers[-1], num_units=hidden_layer_size,
             nonlinearity=lasagne.nonlinearities.rectify))
         if dropout:
-            layers.append(lasagne.layers.DropoutLayer(layers[-1]))
+            layers.append(lasagne.layers.DropoutLayer(layers[-1], .5))
     # Add output layer
     layers.append(lasagne.layers.DenseLayer(
         layers[-1], num_units=n_bits,
