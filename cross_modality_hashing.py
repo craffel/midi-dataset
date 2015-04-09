@@ -11,12 +11,11 @@ import collections
 
 def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
                                 num_filters, filter_size, ds,
-                                hidden_layer_sizes, alpha_XY, m_XY, n_bits,
-                                dropout=False, learning_rate=.001, momentum=.9,
-                                batch_size=50, sequence_length=100,
-                                epoch_size=100, initial_patience=1000,
-                                improvement_threshold=0.99,
-                                patience_increase=10, max_iter=200000):
+                                hidden_layer_sizes, alpha_XY, m_XY,
+                                alpha_stress, n_bits, dropout=False,
+                                learning_rate=.001, momentum=.0, batch_size=10,
+                                sequence_length=100, epoch_size=100,
+                                max_iter=50000, early_check=5000):
     ''' Utility function for training a siamese net for cross-modality hashing
     So many parameters.
     Assumes X_train[n] should be mapped close to Y_train[m] only when n == m
@@ -42,6 +41,8 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
             Scaling parameter for cross-modality negative example cost
         - m_XY : int
             Cross-modality negative example threshold
+        - alpha_stress : float
+            Scaling hyperparameter for embedding stress cost
         - n_bits : int
             Number of bits in the output representation
         - dropout : bool
@@ -56,14 +57,10 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
             Size of extracted sequences
         - epoch_size : int
             Number of mini-batches per epoch
-        - initial_patience : int
-            Always train on at least this many batches
-        - improvement_threshold : float
-            Validation cost must decrease by this factor to increase patience
-        - patience_increase : int
-            How many more epochs should we wait when we increase patience
         - max_iter : int
-            Maximum number of batches to train on, default 200000
+            Maximum number of iterations
+        - early_check : int
+            After this many iterations, if no progress has been made, quit
 
     :returns:
         - epoch : iterator
@@ -90,10 +87,30 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
             num_filters['Y'], filter_size['Y'], ds['Y'],
             hidden_layer_sizes['Y'], dropout, n_bits)}
 
+    # Compute pairwise cosine similarity of the rows of X
+    def cosine_similarity(X):
+        norms = T.sqrt(T.sum(X**2, axis=1))
+        distance_matrix = T.dot(X, X.T)
+        distance_matrix /= norms.reshape((-1, 1))
+        distance_matrix /= norms.reshape((1, -1))
+        return 1 - distance_matrix
+
+    # Compute the stress between original and embedded distances
+    def stress(original, embedded):
+        tri_mask = 1 - np.tri(batch_size*sequence_length,
+                            batch_size*sequence_length, 0,
+                            dtype=theano.config.floatX)
+        return T.sqrt(
+            T.sum(tri_mask*(original - embedded)**2) /
+            T.sum(tri_mask*original**2))
+
     # Compute \sum max(0, m - ||a - b||_2)^2
     def hinge_cost(m, a, b):
         dist = m - T.sqrt(T.sum((a - b)**2, axis=1))
         return T.mean((dist*(dist > 0))**2)
+
+    def flatten_batch(X):
+        return X.dimshuffle((0, 2, 1, 3)).reshape((-1, X.shape[1]*X.shape[3]))
 
     def hasher_cost(deterministic):
         X_p_output = layers['X'][-1].get_output(
@@ -109,26 +126,25 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
         cost_p = T.mean((X_p_output - Y_p_output)**2)
         # Thresholded, scaled cost of cross-modality negative examples
         cost_n = alpha_XY*hinge_cost(m_XY, X_n_output, Y_n_output)
+        # Preserve distances with stress cost
+        cost_stress = alpha_stress*(
+            stress(cosine_similarity(flatten_batch(X_p_input)),
+                cosine_similarity(X_p_output))
+            + stress(cosine_similarity(flatten_batch(Y_p_input)),
+                    cosine_similarity(Y_p_output)))
         # Return sum of these costs
-        return cost_p + cost_n
+        return cost_p + cost_n + cost_stress
 
     # Combine all parameters from both networks
     params = (lasagne.layers.get_all_params(layers['X'][-1])
               + lasagne.layers.get_all_params(layers['Y'][-1]))
     # Compute RMSProp gradient descent updates
     updates = lasagne.updates.rmsprop(hasher_cost(False), params,
-                                     learning_rate, momentum)
+                                      learning_rate, momentum)
     # Function for training the network
     train = theano.function(
         [X_p_input, X_n_input, Y_p_input, Y_n_input], hasher_cost(False),
         updates=updates)
-    # Compute cost without training
-    cost = theano.function(
-        [X_p_input, X_n_input, Y_p_input, Y_n_input], hasher_cost(True))
-
-    # Start with infinite validate cost; we will always increase patience once
-    current_validate_cost = np.inf
-    patience = initial_patience
 
     # Functions for computing the neural net output on the train and val sets
     X_output = theano.function(
@@ -140,13 +156,13 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
     X_validate, Y_validate = hashing_utils.sample_sequences(
         X_validate, Y_validate, sequence_length)
     # Create fixed negative example validation set
-    X_validate_n = X_validate[np.random.permutation(X_validate.shape[0])]
-    Y_validate_n = Y_validate[np.random.permutation(Y_validate.shape[0])]
     X_validate_shuffle = np.random.permutation(X_output(X_validate).shape[0])
     data_iterator = hashing_utils.get_next_batch(
         X_train, Y_train, batch_size, sequence_length, max_iter)
     # We will accumulate the mean train cost over each epoch
     train_cost = 0
+
+    success = False
 
     for n, (X_p, Y_p, X_n, Y_n) in enumerate(data_iterator):
         # Occasionally Theano was raising a MemoryError, this fails gracefully
@@ -166,9 +182,6 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
             epoch_result['train_cost'] = train_cost / float(epoch_size)
             # Reset training cost mean accumulation
             train_cost = 0
-            # Also compute validate cost
-            epoch_result['validate_cost'] = cost(
-                X_validate, X_validate_n, Y_validate, Y_validate_n)
 
             # Compute statistics on validation set
             X_val_output = X_output(X_validate)
@@ -188,24 +201,20 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
             Y_entropy = hashing_utils.hash_entropy(Y_val_output > 0)
             epoch_result['validate_hash_entropy_Y'] = Y_entropy
             # Objective is the ratio of collisions to accurate hashes
-            # When either is smaller than 1e-3, it's not really valid
-            if out_dist[0] > 1e-3 and in_dist[0] > 1e-3:
+            # When either is small, it's not really valid
+            if out_dist[0] > 1e-5 and in_dist[0] > 1e-3:
                 epoch_result['validate_objective'] = out_dist[0]/in_dist[0]
+                success = True
             else:
                 epoch_result['validate_objective'] = np.inf
 
-            if epoch_result['validate_cost'] < current_validate_cost:
-                patience_cost = improvement_threshold*current_validate_cost
-                if epoch_result['validate_cost'] < patience_cost:
-                    patience += epoch_size*patience_increase
-                current_validate_cost = epoch_result['validate_cost']
+            # If we haven't had a successful epoch yet, quit early
+            if n >= early_check and not success:
+                return
 
-            # Store scores and statistics for this epoch
+            # Yield scores and statistics for this epoch
             X_params = lasagne.layers.get_all_param_values(layers['X'][-1])
             Y_params = lasagne.layers.get_all_param_values(layers['Y'][-1])
             yield (epoch_result, X_params, Y_params)
-
-        if n > patience:
-            break
 
     return
