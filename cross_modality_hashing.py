@@ -203,10 +203,10 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
             # Objective is the ratio of collisions to accurate hashes
             # When either is small, it's not really valid
             if out_dist[0] > 1e-5 and in_dist[0] > 1e-3:
-                epoch_result['validate_objective'] = out_dist[0]/in_dist[0]
+                epoch_result['validate_objective'] = in_dist[0]/out_dist[0]
                 success = True
             else:
-                epoch_result['validate_objective'] = np.inf
+                epoch_result['validate_objective'] = 0
 
             # If we haven't had a successful epoch yet, quit early
             if n >= early_check and not success:

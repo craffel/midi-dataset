@@ -4,9 +4,7 @@ import cross_modality_hashing
 import hashing_utils
 import numpy as np
 import os
-import hyperopt
-import pickle
-from network_structure import hidden_layer_sizes, num_filters, filter_size, ds
+import whetlab
 
 
 # Set up paths
@@ -20,68 +18,65 @@ with open(os.path.join(hash_data_directory, 'valid.csv')) as f:
 (X_train, Y_train, X_validate, Y_validate) = hashing_utils.load_data(
     train_list, valid_list)
 
+# Load whetlab experiment
+scientist = whetlab.Experiment(name="Hasher parameter search 1")
+# Get hyperparameter suggestion
+job = scientist.suggest()
+# We will use the suggested parameters to create some other parameters (below)
+# so let's create a copy so we can modify the dict but still use it as a job
+# key later
+params = dict(job)
 
-def objective(params):
-    '''
-    Wrapper around cross-modality hashing for hyperopt
-    '''
-    learning_rate = 10**(-params['learning_rate_exp'])
-    params = dict([(k, v) for k, v in params.items()
-                   if k != 'n_layers' and k != 'learning_rate_exp'])
+# Use the # of hidden layers and the hidden layer power to construct a list
+# [2^hidden_power, 2^hidden_power, ...n_hidden times...]
+hidden_layer_sizes = [2**params['hidden_pow']]*params['n_hidden']
+params['hidden_layer_sizes'] = {'X': hidden_layer_sizes,
+                                'Y': hidden_layer_sizes}
+# Use the number of convolutional layers to construct a list
+# [16, 32 ...n_conv times]
+num_filters = [2**(n + 4) for n in xrange(params['n_conv'])]
+params['num_filters'] = {'X': num_filters, 'Y': num_filters}
+# For X modality, first filter is 12 semitones tall.  For Y modality, that
+# would squash the entire dimension, so the first filter is 3 tall
+params['filter_size'] = {'X': [(5, 12)] + [(3, 3)]*(params['n_conv'] - 1),
+                         'Y': [(5, 3)] + [(3, 3)]*(params['n_conv'] - 1)}
+# Construct a downsample list [(1, 2), (1, 2), ...n_conv times...]
+ds = [(1, 2)]*params['n_conv']
+params['ds'] = {'X': ds, 'Y': ds}
+# Remove hidden_pow, n_hidden, and n_conv parameters
+params = dict([(k, v) for k, v in params.items()
+               if k != 'hidden_pow' and k != 'n_hidden' and k != 'n_conv'])
 
-    for k, v in params.items():
-        print '\t{} : {},'.format(k, v),
-    print '\tlearning_rate: {}'.format(learning_rate)
+for k, v in params.items():
+    print '\t{} : {},'.format(k, v)
 
-    epochs = []
+# Train hasher
+epochs = []
+try:
     for epoch, _, _ in cross_modality_hashing.train_cross_modality_hasher(
-            X_train, Y_train, X_validate, Y_validate, num_filters, filter_size,
-            ds, hidden_layer_sizes, n_bits=16, learning_rate=learning_rate,
-            **params):
-        if not np.isfinite(epoch['validate_cost']):
+            X_train, Y_train, X_validate, Y_validate, **params):
+        # Stop training of a nan training cost is encountered
+        if not np.isfinite(epoch['train_cost']):
             break
         epochs.append(epoch)
-    success = np.all([np.isfinite(e['validate_cost']) for e in epochs])
-    if len(epochs) == 0 or not success:
-        print '    Failed to converge.'
-        print
-        return {'loss': 0, 'status': hyperopt.STATUS_FAIL, 'epochs': epochs}
-    else:
-        best_objective = np.min([e['validate_objective'] for e in epochs])
-        best_epoch = [e for e in epochs
-                      if e['validate_objective'] == best_objective][0]
-        for k, v in best_epoch.items():
-            print "\t{:>35} | {}".format(k, v)
-        if best_objective < objective.best_objective:
-            print '### New best {}'.format(best_objective, len(epochs))
-            objective.best_objective = best_objective
-        print
-        return {'loss': best_objective,
-                'status': hyperopt.STATUS_OK,
-                'epochs': epochs}
-
-objective.best_objective = np.inf
-
-space = {'alpha_XY': hyperopt.hp.uniform('alpha_XY', 0, .25),
-         'm_XY': hyperopt.hp.randint('m_XY', 8),
-         'dropout': hyperopt.hp.randint('dropout', 2),
-         'learning_rate_exp': hyperopt.hp.quniform('learning_rate_exp',
-                                                   0.5, 5.5, 1),
-         'momentum': hyperopt.hp.uniform('momentum', 0, 1)}
-
-if not os.path.exists('../results'):
-    os.makedirs('../results')
-
-trials = hyperopt.Trials()
-try:
-    best = hyperopt.fmin(objective, space=space, algo=hyperopt.tpe.suggest,
-                         max_evals=100, trials=trials)
-    with open('../results/best.pkl', 'wb') as f:
-        pickle.dump(best, f)
-except KeyboardInterrupt:
-    pass
-
-with open('../results/trials.pkl', 'wb') as f:
-    pickle.dump(trials.trials, f)
-with open('../results/results.pkl', 'wb') as f:
-    pickle.dump(trials.results, f)
+# If there was an error while training, report it to whetlab
+except Exception as ex:
+    print "ERROR: {}".format(ex)
+    scientist.update_as_failed(job)
+    sys.exit()
+# Check that all training costs were not Nan; if not, report error to whetlab
+success = np.all([np.isfinite(e['train_cost']) for e in epochs])
+if len(epochs) == 0 or not success:
+    print '    Failed to converge.'
+    print
+    scientist.update_as_failed(job)
+else:
+    # If training was successful, find the maximum validation objective
+    best_objective = np.max([e['validate_objective'] for e in epochs])
+    best_epoch = [e for e in epochs
+                  if e['validate_objective'] == best_objective][0]
+    for k, v in best_epoch.items():
+        print "\t{:>35} | {}".format(k, v)
+    print
+    # and report it to whetlab
+    scientist.update(job, best_objective)
