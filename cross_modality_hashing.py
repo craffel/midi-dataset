@@ -12,7 +12,7 @@ import collections
 def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
                                 num_filters, filter_size, ds,
                                 hidden_layer_sizes, alpha_XY, m_XY,
-                                alpha_stress, n_bits, dropout=False,
+                                alpha_stress, n_bits=16, dropout=False,
                                 learning_rate=.001, momentum=.0, batch_size=10,
                                 sequence_length=100, epoch_size=100,
                                 max_iter=50000, early_check=5000):
