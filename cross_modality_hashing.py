@@ -200,9 +200,10 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
             epoch_result['validate_hash_entropy_X'] = X_entropy
             Y_entropy = hashing_utils.hash_entropy(Y_val_output > 0)
             epoch_result['validate_hash_entropy_Y'] = Y_entropy
-            # Objective is the ratio of collisions to accurate hashes
+            # Objective is the ratio of accurate hashes to collisions
+            # We should try to maximize it
             # When either is small, it's not really valid
-            if out_dist[0] > 1e-5 and in_dist[0] > 1e-3:
+            if out_dist[0] > 1e-5 and in_dist[0] > 1e-2:
                 epoch_result['validate_objective'] = in_dist[0]/out_dist[0]
                 success = True
             else:
