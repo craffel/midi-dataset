@@ -65,13 +65,16 @@ def process_one_file(mp3_filename, skip=True):
     except Exception as e:
         print "Error processing {}: {}".format(mp3_filename, e)
         return
-    # Create subdirectories if they don't exist
-    if not os.path.exists(os.path.split(output_filename)[0]):
-        os.makedirs(os.path.split(output_filename)[0])
     # Save as float32 to save space
     np.savez(output_filename, cqt=cqt.astype(np.float32),
              beats=beats.astype(np.float32), bpm=bpm)
 
+# Create all output paths first to avoid joblib issues
+for mp3_filename in glob.glob(mp3_glob):
+    output_directory = os.path.split(mp3_filename.replace('mp3', 'npz'))[0]
+    if not os.path.exists(output_directory):
+        os.makedirs(output_directory)
+
 joblib.Parallel(n_jobs=10, verbose=50)(
-    joblib.delayed(process_one_file)(mp3_file)
-    for mp3_file in glob.glob(mp3_glob))
+    joblib.delayed(process_one_file)(mp3_filename)
+    for mp3_filename in glob.glob(mp3_glob))
