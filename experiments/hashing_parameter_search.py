@@ -19,7 +19,7 @@ with open(os.path.join(hash_data_directory, 'valid.csv')) as f:
     train_list, valid_list)
 
 # Load whetlab experiment
-scientist = whetlab.Experiment(name="Hasher parameter search 1")
+scientist = whetlab.Experiment(name="Hasher parameter search 2")
 # Get hyperparameter suggestion
 job = scientist.suggest()
 # We will use the suggested parameters to create some other parameters (below)
