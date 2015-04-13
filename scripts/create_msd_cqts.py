@@ -39,7 +39,12 @@ def extract_features(audio_data):
             np.arange(0, 2*beats.shape[0], 2), beats)
         beats = beat_interp(np.arange(2*beats.shape[0] - 1)).astype(int)
         bpm *= 2
+    # Synchronize the CQT to the beats
     sync_gram = librosa.feature.sync(gram, beats)
+    # Also compute log amplitude
+    sync_gram = librosa.logamplitude(sync_gram, refpower=sync_gram.max())
+    # and L2 normalize
+    sync_gram = librosa.util.normalize(sync_gram, norm=2., axis=1)
     return sync_gram, librosa.frames_to_time(beats), bpm
 
 
