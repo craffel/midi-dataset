@@ -90,7 +90,6 @@ if __name__ == '__main__':
         process_one_file(h5_file)
         if not n % 1000:
             print "{:<7} in {:.3f}".format(n, time.time() - now)
-            now = time.time()
 '''
 joblib.Parallel(n_jobs=10, verbose=1)(joblib.delayed(process_one_file)(h5_file)
                                     for h5_file in glob.glob(h5_glob))
