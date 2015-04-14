@@ -34,7 +34,7 @@ def extract_features(audio_data):
     onset_envelope = librosa.onset.onset_strength(S=gram, aggregate=np.median)
     bpm, beats = librosa.beat.beat_track(onset_envelope=onset_envelope)
     # Double the BPM and interpolate beat locations if BPM < 160
-    if bpm < 160:
+    while bpm < 240:
         beat_interp = scipy.interpolate.interp1d(
             np.arange(0, 2*beats.shape[0], 2), beats)
         beats = beat_interp(np.arange(2*beats.shape[0] - 1)).astype(int)
