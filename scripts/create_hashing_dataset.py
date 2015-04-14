@@ -39,7 +39,7 @@ for diagnostics_file in glob.glob(os.path.join(aligned_path, 'npz', '*.npz')):
         if beats.size == 0:
             continue
         # Load in pretty midi object
-        pm = pretty_midi.PrettyMIDI(str(diagnostics['midi_filename']))
+        pm = pretty_midi.PrettyMIDI(str(diagnostics['output_midi_filename']))
         start_time = min([n.start for i in pm.instruments for n in i.notes])
         end_time = min(pm.get_end_time(), beats.max())
         # Get indices which fall within the range of correct alignment
