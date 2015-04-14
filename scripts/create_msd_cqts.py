@@ -43,6 +43,8 @@ def extract_features(audio_data):
     sync_gram = librosa.feature.sync(gram, beats)
     # Also compute log amplitude
     sync_gram = librosa.logamplitude(sync_gram, ref_power=sync_gram.max())
+    # Transpose so that rows are samples
+    sync_gram = sync_gram.T
     # and L2 normalize
     sync_gram = librosa.util.normalize(sync_gram, norm=2., axis=1)
     return sync_gram, librosa.frames_to_time(beats), bpm
