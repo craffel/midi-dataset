@@ -82,6 +82,6 @@ for mp3_filename in glob.glob(mp3_glob):
     if not os.path.exists(output_directory):
         os.makedirs(output_directory)
 
-joblib.Parallel(n_jobs=10, verbose=50)(
+joblib.Parallel(n_jobs=11, verbose=51)(
     joblib.delayed(process_one_file)(mp3_filename)
     for mp3_filename in glob.glob(mp3_glob))
