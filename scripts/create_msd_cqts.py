@@ -73,7 +73,7 @@ def process_one_file(mp3_filename, skip=True):
         print "Error processing {}: {}".format(mp3_filename, e)
         return
     # Save as float32 to save space
-    np.savez(output_filename, cqt=cqt.astype(np.float32),
+    np.savez(output_filename, sync_gram=cqt.astype(np.float32),
              beats=beats.astype(np.float32), bpm=bpm)
 
 # Create all output paths first to avoid joblib issues
