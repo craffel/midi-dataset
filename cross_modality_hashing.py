@@ -129,9 +129,9 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
         # Preserve distances with stress cost
         cost_stress = alpha_stress*(
             stress(cosine_similarity(flatten_batch(X_p_input)),
-                cosine_similarity(X_p_output))
+                   cosine_similarity(X_p_output))
             + stress(cosine_similarity(flatten_batch(Y_p_input)),
-                    cosine_similarity(Y_p_output)))
+                     cosine_similarity(Y_p_output)))
         # Return sum of these costs
         return cost_p + cost_n + cost_stress
 
@@ -204,10 +204,11 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
             # We should try to maximize it
             # When either is small, it's not really valid
             if out_dist[0] > 1e-5 and in_dist[0] > 1e-2:
-                epoch_result['validate_objective'] = in_dist[0]/out_dist[0]
+                bhatt_coeff = -np.sum(np.sqrt(in_dist*out_dist))
+                epoch_result['validate_objective'] = bhatt_coeff
                 success = True
             else:
-                epoch_result['validate_objective'] = 0
+                epoch_result['validate_objective'] = -1
 
             # If we haven't had a successful epoch yet, quit early
             if n >= early_check and not success:
