@@ -59,17 +59,17 @@ if __name__ == '__main__':
     parser.add_argument('--alpha_XY', dest='alpha_XY', type=float, default=.2,
                         help='alpha_XY regularization parameter')
     parser.add_argument('--alpha_stress', dest='alpha_stress', type=float,
-                        default=.1, help='Stress regularization parameter')
+                        default=0., help='Stress regularization parameter')
     parser.add_argument('--dropout', dest='dropout', type=bool, default=False,
                         help='Should we use dropout?')
     parser.add_argument('--hidden_pow', dest='hidden_pow', type=int,
                         default=11, help='Hidden layer size exponent')
     parser.add_argument('--learning_rate', dest='learning_rate', type=float,
                         default=.001, help='Learning rate')
-    parser.add_argument('--m_XY', dest='m_XY', type=int, default=3,
+    parser.add_argument('--m_XY', dest='m_XY', type=int, default=4,
                         help='m_XY regularization threshold parameter')
     parser.add_argument('--momentum', dest='momentum', type=float,
-                        default=0.5, help='Optimization momentum')
+                        default=0., help='Optimization momentum')
     parser.add_argument('--n_conv', dest='n_conv', type=int, default=2,
                         help='Number of convolutional layers')
     parser.add_argument('--n_hidden', dest='n_hidden', type=int, default=2,
