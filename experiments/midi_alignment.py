@@ -153,7 +153,7 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
             midi_gram = features['gram']
         # If there was a problem reading, force re-cration
         except:
-            cache_audio_cqt = True
+            cache_midi_cqt = True
 
     if cache_midi_cqt:
         print "Creating CQT for {}".format(os.path.split(midi_filename)[1])
