@@ -132,8 +132,15 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
                    cosine_similarity(X_p_output))
             + stress(cosine_similarity(flatten_batch(Y_p_input)),
                      cosine_similarity(Y_p_output)))
-        # Return sum of these costs
-        return cost_p + cost_n + cost_stress
+        # Always include positive example cost
+        cost = cost_p
+        # Only add in cost_n and cost_stress if the corresponding
+        # regularization terms are greater than 0
+        if alpha_XY > 0:
+            cost += cost_n
+        if alpha_stress > 0:
+            cost += cost_stress
+        return cost
 
     # Combine all parameters from both networks
     params = (lasagne.layers.get_all_params(layers['X'][-1])
