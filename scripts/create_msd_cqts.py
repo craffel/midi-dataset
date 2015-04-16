@@ -61,8 +61,7 @@ def process_one_file(mp3_filename, skip=True):
             Whether to skip files when the npz already exists
     '''
     # npz files go in the 'npz' dir instead of 'mp3'
-    output_filename = mp3_filename.replace(
-        'clip.mp3', 'npz').replace('mp3', 'npz')
+    output_filename = mp3_filename.replace('mp3', 'npz')
     # Skip files already created
     if skip and os.path.exists(output_filename):
         return
