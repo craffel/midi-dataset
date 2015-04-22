@@ -8,6 +8,7 @@ import hashing_utils
 import numpy as np
 import os
 import argparse
+import glob
 
 
 def train(params):
@@ -18,10 +19,10 @@ def train(params):
     # Set up paths
     base_data_directory = '../data'
     hash_data_directory = os.path.join(base_data_directory, 'hash_dataset')
-    with open(os.path.join(hash_data_directory, 'train.csv')) as f:
-        train_list = f.read().splitlines()
-    with open(os.path.join(hash_data_directory, 'valid.csv')) as f:
-        valid_list = f.read().splitlines()
+    train_list = list(glob.glob(os.path.join(
+        hash_data_directory, 'train', 'npz', '*.npz')))
+    valid_list = list(glob.glob(os.path.join(
+        hash_data_directory, 'valid', 'npz', '*.npz')))
     # Load in the data
     (X_train, Y_train, X_validate, Y_validate) = hashing_utils.load_data(
         train_list, valid_list)
@@ -38,9 +39,9 @@ def train(params):
     # For X modality, first filter is 12 semitones tall.  For Y modality, that
     # would squash the entire dimension, so the first filter is 3 tall
     params['filter_size'] = {'X': [(5, 12)] + [(3, 3)]*(params['n_conv'] - 1),
-                             'Y': [(5, 3)] + [(3, 3)]*(params['n_conv'] - 1)}
+                             'Y': [(5, 12)] + [(3, 3)]*(params['n_conv'] - 1)}
     # Construct a downsample list [(1, 2), (1, 2), ...n_conv times...]
-    ds = [(1, 2)]*params['n_conv']
+    ds = [(2, 2), (2, 2)] + [(1, 2)]*(params['n_conv'] - 2)
     params['ds'] = {'X': ds, 'Y': ds}
     # Remove hidden_pow, n_hidden, and n_conv parameters
     params = dict([(k, v) for k, v in params.items()
@@ -56,10 +57,8 @@ def train(params):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train a hasher')
-    parser.add_argument('--alpha_XY', dest='alpha_XY', type=float, default=.2,
+    parser.add_argument('--alpha_XY', dest='alpha_XY', type=float, default=.5,
                         help='alpha_XY regularization parameter')
-    parser.add_argument('--alpha_stress', dest='alpha_stress', type=float,
-                        default=0., help='Stress regularization parameter')
     parser.add_argument('--dropout', dest='dropout', type=bool, default=False,
                         help='Should we use dropout?')
     parser.add_argument('--hidden_pow', dest='hidden_pow', type=int,
@@ -69,7 +68,7 @@ if __name__ == '__main__':
     parser.add_argument('--m_XY', dest='m_XY', type=int, default=4,
                         help='m_XY regularization threshold parameter')
     parser.add_argument('--momentum', dest='momentum', type=float,
-                        default=0., help='Optimization momentum')
+                        default=0.65, help='Optimization momentum')
     parser.add_argument('--n_conv', dest='n_conv', type=int, default=2,
                         help='Number of convolutional layers')
     parser.add_argument('--n_hidden', dest='n_hidden', type=int, default=2,

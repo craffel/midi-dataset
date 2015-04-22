@@ -5,21 +5,21 @@ import hashing_utils
 import numpy as np
 import os
 import whetlab
-
+import glob
 
 # Set up paths
 base_data_directory = '../data'
 hash_data_directory = os.path.join(base_data_directory, 'hash_dataset')
-with open(os.path.join(hash_data_directory, 'train.csv')) as f:
-    train_list = f.read().splitlines()
-with open(os.path.join(hash_data_directory, 'valid.csv')) as f:
-    valid_list = f.read().splitlines()
+train_list = list(glob.glob(os.path.join(
+    hash_data_directory, 'train', 'npz', '*.npz')))
+valid_list = list(glob.glob(os.path.join(
+    hash_data_directory, 'valid', 'npz', '*.npz')))
 # Load in the data
 (X_train, Y_train, X_validate, Y_validate) = hashing_utils.load_data(
     train_list, valid_list)
 
 # Load whetlab experiment
-scientist = whetlab.Experiment(name="Hasher parameter search 3")
+scientist = whetlab.Experiment(name="Hashing parameter search 6")
 # Get hyperparameter suggestion
 job = scientist.suggest()
 # We will use the suggested parameters to create some other parameters (below)
@@ -29,19 +29,18 @@ params = dict(job)
 
 # Use the # of hidden layers and the hidden layer power to construct a list
 # [2^hidden_power, 2^hidden_power, ...n_hidden times...]
-hidden_layer_sizes = [2**params['hidden_pow']]*params['n_hidden']
+hidden_layer_sizes = [2**11]*params['n_hidden']
 params['hidden_layer_sizes'] = {'X': hidden_layer_sizes,
                                 'Y': hidden_layer_sizes}
 # Use the number of convolutional layers to construct a list
 # [16, 32 ...n_conv times]
 num_filters = [2**(n + 4) for n in xrange(params['n_conv'])]
 params['num_filters'] = {'X': num_filters, 'Y': num_filters}
-# For X modality, first filter is 12 semitones tall.  For Y modality, that
-# would squash the entire dimension, so the first filter is 3 tall
+# First filter is 12 semitones tall
 params['filter_size'] = {'X': [(5, 12)] + [(3, 3)]*(params['n_conv'] - 1),
-                         'Y': [(5, 3)] + [(3, 3)]*(params['n_conv'] - 1)}
+                         'Y': [(5, 12)] + [(3, 3)]*(params['n_conv'] - 1)}
 # Construct a downsample list [(1, 2), (1, 2), ...n_conv times...]
-ds = [(1, 2)]*params['n_conv']
+ds = [(2, 2), (2, 2)] + [(1, 2)]*(params['n_conv'] - 2)
 params['ds'] = {'X': ds, 'Y': ds}
 # Remove hidden_pow, n_hidden, and n_conv parameters
 params = dict([(k, v) for k, v in params.items()

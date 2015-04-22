@@ -38,7 +38,7 @@ for pkl_file in glob.glob('../data/msd/pkl/*/*/*/*.pkl'):
             print "Error loading {}: {}".format(pkl_file, e)
 
 # Extract mean chroma vectors
-mean_chromas = np.array([d['mean_chroma'] for d in data])
+mean_chromas = np.array([d['mean_cqt'] for d in data])
 # Create a separate list of the sequences
 sequences = [d['hash_list'] for d in data]
 # And a separate list of IDs
@@ -71,7 +71,7 @@ def match_one_midi(midi_data, msd_match_indices):
     # Find indices of MSD sequences where the distance between MSD/MIDI mean
     # chroma vectors is within the provided percentile
     valid_chroma_indices = hash_match.filter_by_mean_chroma(
-        midi_data['mean_chroma'], mean_chromas, CHROMA_PERCENTILE)
+        midi_data['mean_cqt'], mean_chromas, CHROMA_PERCENTILE)
     # Intersect these two index sets to determine which indices to use
     valid_indices = np.intersect1d(valid_length_indices, valid_chroma_indices)
     # Match this MIDI sequence against MSD sequences
@@ -108,8 +108,14 @@ def match_one_midi(midi_data, msd_match_indices):
 
 midi_datas = []
 msd_match_index_lists = []
+midi_h5_mapping = []
 with open(PAIR_FILE) as f:
-    midi_h5_mapping = [line.strip().split(',') for line in f.readlines()]
+    for line in f.readlines():
+        midi_md5, dataset, msd_id = line.strip().split(',')
+        # The pairs.csv files will include pairs from all datasets
+        # Only grab those for the MSD
+        if dataset == 'msd':
+            midi_h5_mapping.append([midi_md5, msd_id])
 
 for midi_md5, msd_id in midi_h5_mapping:
     midi_entry = [entry for entry in midi_index if entry['md5'] == midi_md5]
@@ -137,7 +143,7 @@ for midi_md5, msd_id in midi_h5_mapping:
             msd_match_indices.append(msd_ids.index(id))
     msd_match_index_lists.append(msd_match_indices)
 
-results = joblib.Parallel(n_jobs=11, verbose=10)(
+results = joblib.Parallel(n_jobs=11, verbose=51)(
     joblib.delayed(match_one_midi)(midi_data, msd_match_indices)
     for midi_data, msd_match_indices in zip(midi_datas, msd_match_index_lists))
 
