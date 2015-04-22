@@ -16,7 +16,6 @@ def plot_best_path(similarity_matrix, p, q):
             second-axis indices of best path through matrix
     '''
     plt.imshow(similarity_matrix.T,
-               aspect='auto',
                interpolation='nearest',
                cmap=plt.cm.gray)
     tight = plt.axis()
