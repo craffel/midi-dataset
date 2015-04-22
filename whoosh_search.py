@@ -23,7 +23,7 @@ def create_index_writer(index_path):
     if not os.path.exists(index_path):
         os.mkdir(index_path)
 
-    A = (whoosh.analysis.StemmingAnalyzer() |
+    A = (whoosh.analysis.StandardAnalyzer(stoplist=None, minsize=1) |
          whoosh.analysis.CharsetFilter(accent_map))
 
     Schema = whoosh.fields.Schema(
