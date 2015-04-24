@@ -58,11 +58,14 @@ try:
         if not np.isfinite(epoch['train_cost']):
             break
         epochs.append(epoch)
+        print "{}: {}, ".format(epoch['iteration'],
+                                epoch['validate_objective']),
 # If there was an error while training, report it to whetlab
 except Exception as ex:
     print "ERROR: {}".format(ex)
     scientist.update_as_failed(job)
     sys.exit()
+print
 # Check that all training costs were not Nan; if not, report error to whetlab
 success = np.all([np.isfinite(e['train_cost']) for e in epochs])
 if len(epochs) == 0 or not success:
