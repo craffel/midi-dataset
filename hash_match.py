@@ -86,7 +86,9 @@ def int_dist(x, y, output, thresh, bits_set=bits_set):
     return n_below
 
 
-@numba.jit('void(u2[:, :], u2, u2[:, :])',
+@numba.jit(['void(u2[:, :], u2, u2[:, :])',
+            'void(f8[:, :], f8, f8[:, :])',
+            'void(f4[:, :], f4, f4[:, :])'],
            locals={'i': numba.uint16,
                    'j': numba.uint16},
            nopython=True)
