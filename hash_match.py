@@ -6,6 +6,7 @@ import numba
 import scipy.spatial.distance
 
 N_BITS = 16
+INT_MAX = 2**(N_BITS - 1) + 1
 
 # Construct "bits-set-table"
 bits_set = np.zeros(2**N_BITS, dtype=np.uint16)
@@ -45,11 +46,12 @@ def vectors_to_ints(vectors):
     return (vectors*2**(np.arange(vectors.shape[1])*vectors)).sum(axis=1)
 
 
-@numba.jit('void(u2[:], u2[:], u2[:, :], u2[:])',
+@numba.jit('u4(u2[:], u2[:], u2[:, :], u2, u2[:])',
            locals={'m': numba.uint16,
-                   'n': numba.uint16},
+                   'n': numba.uint16,
+                   'tot': numba.uint32},
            nopython=True)
-def int_dist(x, y, output, bits_set=bits_set):
+def int_dist(x, y, output, thresh, bits_set=bits_set):
     '''
     Compute the pairwise bit-distance matrix of two sequences of integers.
 
@@ -61,12 +63,17 @@ def int_dist(x, y, output, bits_set=bits_set):
         - output : np.ndarray, dtype='uint16'
             Pre-allocated matrix where the pairwise distances will be stored.
             shape=(x.shape[0], y.shape[0])
+        - thresh : uint16
+            The number of entries in the dist matrix below this threshold will
+            be returned
         - bits_set : np.ndarray, dtype='uint16'
             Table where bits_set(x) is the number of 1s in the binary
             representation of x, where x is an unsigned 16 bit int
     '''
     nx = x.shape[0]
     ny = y.shape[0]
+    # Keep track of the total number of distances below the threshold
+    n_below = 0
     # Populate the distance matrix
     for m in xrange(nx):
         for n in xrange(ny):
@@ -75,6 +82,8 @@ def int_dist(x, y, output, bits_set=bits_set):
             # the same.  Retrieving the entry in bits_set will then count
             # the number of entries in x[m] and y[n] which are the same.
             output[m, n] = bits_set[x[m] ^ y[n]]
+            n_below += (output[m, n] < thresh)
+    return n_below
 
 
 @numba.jit('void(u2[:, :], u2, u2[:, :])',
@@ -223,10 +232,16 @@ def match_one_sequence(query, sequences, gully, penalty,
             List of match indices
         - scores : list of float
             Scores for each match
+        - n_pruned_dist : int
+            Number of sequences pruned because not enough distances were
+            below the current threshold
     '''
     # Pre-allocate match and score lists
     matches = []
     scores = []
+    n_pruned_dist = 0
+    # Keep track of the best DTW score so far
+    best_so_far = INT_MAX
     # Default: Check all sequences
     if sequence_indices is None:
         sequence_indices = xrange(len(sequences))
@@ -234,9 +249,19 @@ def match_one_sequence(query, sequences, gully, penalty,
         # Compute distance matrix
         distance_matrix = np.empty(
             (query.shape[0], sequences[n].shape[0]), dtype=np.uint16)
-        int_dist(query, sequences[n], distance_matrix, bits_set)
-        # Compute DTW distance
-        score = dtw(distance_matrix, gully, penalty)
+        # int_dist returns the numbet of entries below the supplied thresold
+        # in the distance matrix
+        n_below = int_dist(query, sequences[n], distance_matrix,
+                           int(np.ceil(best_so_far)), bits_set)
+
+        # If the number of entries below the ceil(best_cost_so_far) is greater
+        # than the min path length, don't bother computing DTW
+        if n_below < min(query.shape[0], sequences[n].shape[0]):
+            n_pruned_dist += 0
+            score = np.inf
+        else:
+            # Compute DTW distance
+            score = dtw(distance_matrix, gully, penalty)
         # Store the score/match (even if it's not the best)
         matches.append(n)
         scores.append(score)
@@ -244,4 +269,4 @@ def match_one_sequence(query, sequences, gully, penalty,
     sorted_idx = np.argsort(scores)
     matches = [matches[n] for n in sorted_idx]
     scores = [scores[n] for n in sorted_idx]
-    return matches, scores
+    return matches, scores, n_pruned_dist

@@ -65,7 +65,7 @@ def match_one_midi(midi_data, msd_match_indices):
             Dictionary with diagnostics about whether this match was successful
     '''
     # Match this MIDI sequence against MSD sequences
-    matches, scores = hash_match.match_one_sequence(
+    matches, scores, n_pruned_dist = hash_match.match_one_sequence(
         midi_data['hash_list'], sequences, GULLY, PENALTY)
     # Store results of the match
     results = {}
@@ -77,7 +77,7 @@ def match_one_midi(midi_data, msd_match_indices):
     for msd_index in msd_match_indices:
         # If it was pruned by mean chroma/length pruning, compute manually
         if msd_index not in matches:
-            _, score = hash_match.match_one_sequence(
+            _, score, _ = hash_match.match_one_sequence(
                 midi_data['hash_list'], [sequences[msd_index]], GULLY, PENALTY)
             score = score[0]
             rank = (scores < score).sum()
@@ -89,6 +89,7 @@ def match_one_midi(midi_data, msd_match_indices):
         matched_scores.append(score)
     results['msd_match_ranks'] = matched_ranks
     results['msd_match_scores'] = matched_scores
+    results['n_pruned_dist'] = n_pruned_dist
 
     return results
 
