@@ -6,7 +6,6 @@ sys.path.append('..')
 import glob
 import cPickle as pickle
 import hash_match
-import numpy as np
 import os
 import json
 import joblib
@@ -16,8 +15,6 @@ PAIR_FILE = '../file_lists/dev_pairs.csv'
 # Where to output the matching results
 RESULTS_FILE = '../results/dev_results.js'
 
-LENGTH_TOLERANCE = .4
-CHROMA_PERCENTILE = 25
 GULLY = .9
 PENALTY = 4
 
@@ -37,13 +34,10 @@ for pkl_file in glob.glob('../data/msd/pkl/*/*/*/*.pkl'):
         except Exception as e:
             print "Error loading {}: {}".format(pkl_file, e)
 
-# Extract mean chroma vectors
-mean_chromas = np.array([d['mean_cqt'] for d in data])
 # Create a separate list of the sequences
 sequences = [d['hash_list'] for d in data]
 # And a separate list of IDs
 msd_ids = [d['id'] for d in data]
-
 
 # Load in the clean MIDI index
 with open('../data/clean_midi/index.js') as f:
@@ -65,26 +59,13 @@ def match_one_midi(midi_data, msd_match_indices):
         - results : dict
             Dictionary with diagnostics about whether this match was successful
     '''
-    # Find indices of MSD sequences whose length are within the tolerance
-    valid_length_indices = hash_match.filter_by_length(
-        midi_data['hash_list'], sequences, LENGTH_TOLERANCE)
-    # Find indices of MSD sequences where the distance between MSD/MIDI mean
-    # chroma vectors is within the provided percentile
-    valid_chroma_indices = hash_match.filter_by_mean_chroma(
-        midi_data['mean_cqt'], mean_chromas, CHROMA_PERCENTILE)
-    # Intersect these two index sets to determine which indices to use
-    valid_indices = np.intersect1d(valid_length_indices, valid_chroma_indices)
     # Match this MIDI sequence against MSD sequences
     matches, scores = hash_match.match_one_sequence(
-        midi_data['hash_list'], sequences, GULLY, PENALTY, valid_indices)
+        midi_data['hash_list'], sequences, GULLY, PENALTY)
     # Store results of the match
     results = {}
     results['midi_md5'] = midi_data['md5']
     results['msd_match_ids'] = [data[n]['id'] for n in msd_match_indices]
-    results['msd_match_in_length'] = [(idx in valid_length_indices)
-                                      for idx in msd_match_indices]
-    results['msd_match_in_chroma'] = [(idx in valid_chroma_indices)
-                                      for idx in msd_match_indices]
     # Compile the rank and score for each MSD entry which should match the MIDI
     matched_ranks = []
     matched_scores = []
