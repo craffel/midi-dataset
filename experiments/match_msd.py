@@ -17,6 +17,8 @@ RESULTS_FILE = '../results/dev_results.js'
 
 GULLY = .9
 PENALTY = 4
+# Ignore all hash sequences below this length (they cause issues)
+MIN_SEQUENCE_LENGTH = 30
 
 
 def path_to_id(pkl_file):
@@ -29,8 +31,11 @@ data = []
 for pkl_file in glob.glob('../data/msd/pkl/*/*/*/*.pkl'):
     with open(pkl_file) as f:
         try:
-            data.append(pickle.load(f))
-            data[-1]['id'] = path_to_id(pkl_file)
+            pkl = pickle.load(f)
+            if len(pkl['hash_list']) < MIN_SEQUENCE_LENGTH:
+                continue
+            pkl['id'] = path_to_id(pkl_file)
+            data.append(pkl)
         except Exception as e:
             print "Error loading {}: {}".format(pkl_file, e)
 
