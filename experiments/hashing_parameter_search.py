@@ -60,6 +60,7 @@ try:
         epochs.append(epoch)
         print "{}: {}, ".format(epoch['iteration'],
                                 epoch['validate_objective']),
+        sys.stdout.flush()
 # If there was an error while training, report it to whetlab
 except Exception as ex:
     print "ERROR: {}".format(ex)
