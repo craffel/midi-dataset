@@ -7,7 +7,6 @@ import theano
 import scipy.spatial
 import pickle
 import lasagne
-import lasagne.layers.dnn
 import collections
 
 
@@ -296,13 +295,13 @@ def build_network(input_shape, num_filters, filter_size, ds,
     for n in xrange(len(num_filters)):
         # We will initialize weights to \sqrt{2/n_l}
         n_l = num_filters[n]*np.prod(filter_size[n])
-        layers.append(lasagne.layers.dnn.Conv2DDNNLayer(
+        layers.append(lasagne.layers.Conv2DLayer(
             layers[-1], strides=(1, 1), num_filters=num_filters[n],
             filter_size=filter_size[n],
             nonlinearity=lasagne.nonlinearities.rectify,
             W=lasagne.init.Normal(np.sqrt(2./n_l)),
             border_mode='same'))
-        layers.append(lasagne.layers.dnn.MaxPool2DDNNLayer(
+        layers.append(lasagne.layers.MaxPool2DLayer(
             layers[-1], ds[n]))
     # A dense layer will treat any dimensions after the first as feature
     # dimensions, but the third dimension is really a timestep dimension.
