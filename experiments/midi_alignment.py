@@ -234,70 +234,71 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
             return
 
 
-# Create the output dir if it doesn't exist
-output_path = os.path.join(BASE_DATA_PATH, OUTPUT_FOLDER)
-if not os.path.exists(output_path):
-    os.makedirs(output_path)
+if __name__ == '__main__':
+    # Create the output dir if it doesn't exist
+    output_path = os.path.join(BASE_DATA_PATH, OUTPUT_FOLDER)
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
 
-for dataset in DATASETS + [MIDI_PATH, OUTPUT_FOLDER]:
-    if not os.path.exists(os.path.join(BASE_DATA_PATH, dataset, 'npz')):
-        os.makedirs(os.path.join(BASE_DATA_PATH, dataset, 'npz'))
+    for dataset in DATASETS + [MIDI_PATH, OUTPUT_FOLDER]:
+        if not os.path.exists(os.path.join(BASE_DATA_PATH, dataset, 'npz')):
+            os.makedirs(os.path.join(BASE_DATA_PATH, dataset, 'npz'))
 
-# Load in the js filelist for the MIDI dataset used
-midi_js = os.path.join(BASE_DATA_PATH, MIDI_PATH, 'index.js')
-with open(midi_js) as f:
-    midi_list = json.load(f)
+    # Load in the js filelist for the MIDI dataset used
+    midi_js = os.path.join(BASE_DATA_PATH, MIDI_PATH, 'index.js')
+    with open(midi_js) as f:
+        midi_list = json.load(f)
 
-# Load in the js filelist for the MIDI dataset used
-midi_js = os.path.join(BASE_DATA_PATH, MIDI_PATH, 'index.js')
-with open(midi_js) as f:
-    midi_list = json.load(f)
-midi_list = dict((e['md5'], e) for e in midi_list)
+    # Load in the js filelist for the MIDI dataset used
+    midi_js = os.path.join(BASE_DATA_PATH, MIDI_PATH, 'index.js')
+    with open(midi_js) as f:
+        midi_list = json.load(f)
+    midi_list = dict((e['md5'], e) for e in midi_list)
 
-file_lists = {}
-for dataset in DATASETS:
-    # Load in the json filelist for this audio dataset
-    with open(os.path.join(BASE_DATA_PATH, dataset, 'index.js')) as f:
-        file_list = json.load(f)
-    # Allow looking up entries by string ID returned by whoosh
-    if dataset == 'msd':
-        file_lists[dataset] = dict((e['track_id'], e) for e in file_list)
-    else:
-        file_lists[dataset] = dict((str(n), e)
-                                   for n, e in enumerate(file_list))
+    file_lists = {}
+    for dataset in DATASETS:
+        # Load in the json filelist for this audio dataset
+        with open(os.path.join(BASE_DATA_PATH, dataset, 'index.js')) as f:
+            file_list = json.load(f)
+        # Allow looking up entries by string ID returned by whoosh
+        if dataset == 'msd':
+            file_lists[dataset] = dict((e['track_id'], e) for e in file_list)
+        else:
+            file_lists[dataset] = dict((str(n), e)
+                                       for n, e in enumerate(file_list))
 
-# Load in pairs file
-with open('../file_lists/text_matches.js') as f:
-    text_matches = json.load(f)
-flattened_matches = sum([list(itertools.product(*match))
-                         for match in text_matches], [])
+    # Load in pairs file
+    with open('../file_lists/text_matches.js') as f:
+        text_matches = json.load(f)
+    flattened_matches = sum([list(itertools.product(*match))
+                            for match in text_matches], [])
 
-pairs = [(midi_list[midi_md5], file_lists[dataset][id])
-         for midi_md5, (dataset, id) in flattened_matches]
+    pairs = [(midi_list[midi_md5], file_lists[dataset][id])
+            for midi_md5, (dataset, id) in flattened_matches]
 
-# Construct a list of MIDI-audio matches, which will be attempted alignments
-pairs = []
-for midi_md5, (dataset, id) in flattened_matches:
-    # Populate aruments for each pair
-    file_basename = file_lists[dataset][id]['path']
-    output_basename = '{}_{}_{}'.format(dataset, id, midi_md5)
-    audio_filename = path_to_file(
-        dataset, file_basename, 'mp3')
-    midi_filename = path_to_file(
-        MIDI_PATH, midi_list[midi_md5]['path'], 'mid')
-    audio_features_filename = path_to_file(
-        dataset, file_basename, 'npz')
-    midi_features_filename = path_to_file(
-        MIDI_PATH, midi_list[midi_md5]['path'], 'npz')
-    output_midi_filename = path_to_file(
-        OUTPUT_FOLDER, output_basename, 'mid')
-    output_diagnostics_filename = path_to_file(
-        OUTPUT_FOLDER, output_basename, 'npz')
-    pairs.append((audio_filename, midi_filename,
-                  audio_features_filename, midi_features_filename,
-                  output_midi_filename,
-                  output_diagnostics_filename))
+    # Construct a list of MIDI-audio matches, which will be attempted
+    pairs = []
+    for midi_md5, (dataset, id) in flattened_matches:
+        # Populate aruments for each pair
+        file_basename = file_lists[dataset][id]['path']
+        output_basename = '{}_{}_{}'.format(dataset, id, midi_md5)
+        audio_filename = path_to_file(
+            dataset, file_basename, 'mp3')
+        midi_filename = path_to_file(
+            MIDI_PATH, midi_list[midi_md5]['path'], 'mid')
+        audio_features_filename = path_to_file(
+            dataset, file_basename, 'npz')
+        midi_features_filename = path_to_file(
+            MIDI_PATH, midi_list[midi_md5]['path'], 'npz')
+        output_midi_filename = path_to_file(
+            OUTPUT_FOLDER, output_basename, 'mid')
+        output_diagnostics_filename = path_to_file(
+            OUTPUT_FOLDER, output_basename, 'npz')
+        pairs.append((audio_filename, midi_filename,
+                    audio_features_filename, midi_features_filename,
+                    output_midi_filename,
+                    output_diagnostics_filename))
 
-# Run alignment
-joblib.Parallel(n_jobs=10, verbose=51)(joblib.delayed(align_one_file)(*args)
-                                       for args in pairs)
+    # Run alignment
+    joblib.Parallel(n_jobs=10, verbose=51)(
+        joblib.delayed(align_one_file)(*args) for args in pairs)
