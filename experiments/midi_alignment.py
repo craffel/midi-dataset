@@ -3,12 +3,12 @@ import librosa
 import pretty_midi
 import joblib
 import os
-import align_midi
 import sys
 sys.path.append('..')
 import itertools
 import json
 import alignment_utils
+import djitw
 
 BASE_DATA_PATH = '../data/'
 MIDI_PATH = 'clean_midi'
@@ -196,8 +196,13 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
     try:
         # Get similarity matrix
         similarity_matrix = 1 - np.dot(midi_sync_gram, audio_sync_gram.T)
+        # Non-diagonal additive path penalty is the 90th percentile of sim mtx
+        add_pen = np.percentile(similarity_matrix, 90)
         # Get best path through matrix
-        p, q, score = align_midi.dpmod(similarity_matrix)
+        p, q, score = djitw.dtw(similarity_matrix, gully=.95,
+                                additive_penalty=add_pen, inplace=False)
+        # Normalize score by path length
+        score /= float(len(p))
         # Normalize score by score by mean sim matrix value within path chunk
         score /= similarity_matrix[p.min():p.max(), q.min():q.max()].mean()
     except Exception as e:
@@ -210,10 +215,10 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
     if output_midi_filename is not None:
         try:
             # Adjust MIDI timing
-            m_aligned = align_midi.adjust_midi(
-                m, midi_beats[p], librosa.frames_to_time(audio_beats)[q])
+            m.adjust_times(
+                midi_beats[p], librosa.frames_to_time(audio_beats)[q])
             check_subdirectories(output_midi_filename)
-            m_aligned.write(output_midi_filename)
+            m.write(output_midi_filename)
         except Exception as e:
             print "Error writing aligned .mid for {}: {}".format(
                 os.path.split(midi_filename)[1], e)
