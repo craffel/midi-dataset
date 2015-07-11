@@ -82,6 +82,11 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
         - output_diagnostics_filename : str or NoneType
             Full path to a file to write out diagnostic information (similarity
             matrix, best path, etc) in a .npz file.  If None, don't output.
+    :returns:
+        - p, q : np.ndarray
+            Indices of the lowest-cost alignment between the audio and MIDI
+        - score : float
+            Normalized DTW path distance
     '''
     try:
         m = pretty_midi.PrettyMIDI(midi_filename)
@@ -232,6 +237,7 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
                 os.path.split(audio_filename)[1],
                 os.path.split(midi_filename)[1], e)
             return
+    return p, q, score
 
 
 if __name__ == '__main__':
