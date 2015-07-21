@@ -96,14 +96,14 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
         return T.mean((dist*(dist > 0))**2)
 
     def hasher_cost(deterministic):
-        X_p_output = layers['X'][-1].get_output(
-            X_p_input, deterministic=deterministic)
-        X_n_output = layers['X'][-1].get_output(
-            X_n_input, deterministic=deterministic)
-        Y_p_output = layers['Y'][-1].get_output(
-            Y_p_input, deterministic=deterministic)
-        Y_n_output = layers['Y'][-1].get_output(
-            Y_n_input, deterministic=deterministic)
+        X_p_output = lasagne.layers.get_output(
+            layers['X'][-1], X_p_input, deterministic=deterministic)
+        X_n_output = lasagne.layers.get_output(
+            layers['X'][-1], X_n_input, deterministic=deterministic)
+        Y_p_output = lasagne.layers.get_output(
+            layers['Y'][-1], Y_p_input, deterministic=deterministic)
+        Y_n_output = lasagne.layers.get_output(
+            layers['Y'][-1], Y_n_input, deterministic=deterministic)
 
         # Unthresholded, unscaled cost of positive examples across modalities
         cost_p = T.mean((X_p_output - Y_p_output)**2)

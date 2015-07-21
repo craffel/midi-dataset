@@ -296,7 +296,7 @@ def build_network(input_shape, num_filters, filter_size, ds,
         # We will initialize weights to \sqrt{2/n_l}
         n_l = num_filters[n]*np.prod(filter_size[n])
         layers.append(lasagne.layers.Conv2DLayer(
-            layers[-1], strides=(1, 1), num_filters=num_filters[n],
+            layers[-1], stride=(1, 1), num_filters=num_filters[n],
             filter_size=filter_size[n],
             nonlinearity=lasagne.nonlinearities.rectify,
             W=lasagne.init.Normal(np.sqrt(2./n_l)),
@@ -309,7 +309,7 @@ def build_network(input_shape, num_filters, filter_size, ds,
     # need to place the time stpe dimension after the batch dimension
     layers.append(lasagne.layers.DimshuffleLayer(
         layers[-1], (0, 2, 1, 3)))
-    conv_output_shape = layers[-1].get_output_shape()
+    conv_output_shape = layers[-1].output_shape
     # Reshape to (n_batch*n_time_steps, n_conv_output_features)
     layers.append(lasagne.layers.ReshapeLayer(
         layers[-1], (-1, conv_output_shape[2]*conv_output_shape[3])))
