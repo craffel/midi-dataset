@@ -109,11 +109,8 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
         cost_p = T.mean((X_p_output - Y_p_output)**2)
         # Thresholded, scaled cost of cross-modality negative examples
         cost_n = alpha_XY*hinge_cost(m_XY, X_n_output, Y_n_output)
-        # Always include positive example cost
-        cost = cost_p
-        # Only add in cost_n if its regularization term is greater than 0
-        if alpha_XY > 0:
-            cost += cost_n
+        # Sum positive and negative costs for overall cost
+        cost = cost_p + cost_n
         return cost
 
     # Combine all parameters from both networks
