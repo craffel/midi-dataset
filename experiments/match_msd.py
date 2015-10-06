@@ -9,16 +9,21 @@ import hash_match
 import os
 import json
 import joblib
+import numpy as np
 
 # Path to the list of MIDI<->pairs file
 PAIR_FILE = '../file_lists/dev_pairs.csv'
 # Where to output the matching results
-RESULTS_FILE = '../results/dev_results.js'
+RESULTS_FILE = '../results/dev_results_alignment_verified.js'
+# Where the aligned clean MIDI diagnostics files live
+ALIGNMENT_DIAGNOSTICS_PATH = '../data/clean_midi_aligned/npz/'
 
 GULLY = .9
 PENALTY = 4
 # Ignore all hash sequences below this length (they cause issues)
 MIN_SEQUENCE_LENGTH = 30
+# A DP score above this means the alignment is bad
+SCORE_THRESHOLD = .78
 
 
 def path_to_id(pkl_file):
@@ -102,7 +107,14 @@ with open(PAIR_FILE) as f:
         # The pairs.csv files will include pairs from all datasets
         # Only grab those for the MSD
         if dataset == 'msd':
-            midi_h5_mapping.append([midi_md5, msd_id])
+            # Only include if the alignment was successful
+            alignment_file = os.path.join(
+                ALIGNMENT_DIAGNOSTICS_PATH,
+                'msd_{}_{}.npz'.format(msd_id, midi_md5))
+            if os.path.exists(alignment_file):
+                diagnostics = np.load(alignment_file)
+                if diagnostics['score'] < SCORE_THRESHOLD:
+                    midi_h5_mapping.append([midi_md5, msd_id])
 
 for midi_md5, msd_id in midi_h5_mapping:
     midi_entry = [entry for entry in midi_index if entry['md5'] == midi_md5]
