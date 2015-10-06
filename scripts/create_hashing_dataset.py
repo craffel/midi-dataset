@@ -109,7 +109,7 @@ def pair_to_path(pair):
                         '{}_{}_{}.npz'.format(dataset, id, midi_md5))
 
 for dataset in ['train', 'valid']:
-    if not os.path.exists(output_path, dataset, 'npz'):
+    if not os.path.exists(os.path.join(output_path, dataset, 'npz')):
         os.makedirs(os.path.join(output_path, dataset, 'npz'))
     # Load in all train pairs
     with open(os.path.join(FILE_LIST_PATH,
