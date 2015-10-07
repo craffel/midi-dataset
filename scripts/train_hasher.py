@@ -75,6 +75,6 @@ if __name__ == '__main__':
                         help='Number of hidden layers')
     X_params, Y_params = train(vars(parser.parse_args()))
     if not os.path.exists('../results'):
-        os.path.makedirs('../results')
+        os.makedirs('../results')
     hashing_utils.save_model(X_params, '../results/model_X.pkl')
     hashing_utils.save_model(Y_params, '../results/model_Y.pkl')
