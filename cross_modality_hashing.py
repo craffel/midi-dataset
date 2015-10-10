@@ -133,10 +133,10 @@ def train_cross_modality_hasher(X_train, Y_train, X_validate, Y_validate,
     patience = initial_patience
 
     # Functions for computing the neural net output on the train and val sets
-    X_output = theano.function(
-        [X_input], layers['X'][-1].get_output(X_input, deterministic=True))
-    Y_output = theano.function(
-        [Y_input], layers['Y'][-1].get_output(Y_input, deterministic=True))
+    X_output = theano.function([X_input], lasagne.layers.get_output(
+        layers['X'][-1], X_input, deterministic=True))
+    Y_output = theano.function([Y_input], lasagne.layers.get_output(
+        layers['Y'][-1], Y_input, deterministic=True))
 
     # Extract sample seqs from the validation set (only need to do this once)
     X_validate, Y_validate = hashing_utils.sample_sequences(

@@ -300,9 +300,9 @@ def build_network(input_shape, num_filters, filter_size, ds,
             filter_size=filter_size[n],
             nonlinearity=lasagne.nonlinearities.rectify,
             W=lasagne.init.Normal(np.sqrt(2./n_l)),
-            border_mode='same'))
+            pad='same'))
         layers.append(lasagne.layers.MaxPool2DLayer(
-            layers[-1], ds[n]))
+            layers[-1], ds[n], ignore_border=False))
     # A dense layer will treat any dimensions after the first as feature
     # dimensions, but the third dimension is really a timestep dimension.
     # We can only squash adjacent dimensions with a ReshapeLayer, so we

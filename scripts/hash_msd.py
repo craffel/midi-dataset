@@ -14,6 +14,7 @@ import theano
 import time
 from network_structure import (hidden_layer_sizes, num_filters, filter_size,
                                ds, dropout, n_bits)
+import lasagne
 
 BASE_DATA_PATH = '../data'
 output_path = os.path.join(BASE_DATA_PATH, 'msd', 'pkl')
@@ -22,11 +23,12 @@ if not os.path.exists(output_path):
     os.makedirs(output_path)
 
 layers = hashing_utils.build_network(
-    (None, 1, 100, 48), num_filters['Y'], filter_size['Y'], ds['Y'],
+    (None, 1, None, 48), num_filters['Y'], filter_size['Y'], ds['Y'],
     hidden_layer_sizes['Y'], dropout, n_bits)
 hashing_utils.load_model(layers, '../results/model_Y.pkl')
 hash = theano.function(
-    [layers[0].input_var], layers[-1].get_output(deterministic=True))
+    [layers[0].input_var],
+    lasagne.layers.get_output(layers[-1], deterministic=True))
 
 npz_glob = os.path.join(BASE_DATA_PATH, 'msd', 'npz', '*', '*', '*', '*.npz')
 

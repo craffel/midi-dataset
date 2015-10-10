@@ -12,7 +12,7 @@ import theano
 import time
 from network_structure import (hidden_layer_sizes, num_filters, filter_size,
                                ds, n_bits, dropout)
-
+import lasagne
 from hash_msd import process_one_file
 
 BASE_DATA_PATH = '../data'
@@ -22,11 +22,12 @@ if not os.path.exists(output_path):
     os.makedirs(output_path)
 
 layers = hashing_utils.build_network(
-    (None, 1, 100, 48), num_filters['X'], filter_size['X'], ds['X'],
+    (None, 1, None, 48), num_filters['X'], filter_size['X'], ds['X'],
     hidden_layer_sizes['X'], dropout, n_bits)
 hashing_utils.load_model(layers, '../results/model_X.pkl')
 hash = theano.function(
-    [layers[0].input_var], layers[-1].get_output(deterministic=True))
+    [layers[0].input_var],
+    lasagne.layers.get_output(layers[-1], deterministic=True))
 
 # Load in training set statistics for standardization
 with open('../results/X_mean_std.pkl') as f:
