@@ -71,12 +71,16 @@ def process_one_file(diagnostics_file, dataset):
         if beats.size == 0:
             return
         # Synthesize MIDI data and extract CQT
-        midi_audio = alignment_utils.fast_fluidsynth(pm, MIDI_FS)
-        midi_gram = librosa.cqt(
-            midi_audio, sr=MIDI_FS, hop_length=MIDI_HOP,
-            fmin=librosa.midi_to_hz(NOTE_START), n_bins=N_NOTES)
-        midi_sync_gram = alignment_utils.post_process_cqt(
-            midi_gram, librosa.time_to_frames(beats, MIDI_FS, MIDI_HOP))
+        max_frame = int(pm.get_end_time()*MIDI_FS/MIDI_HOP)
+        midi_gram = pm.get_piano_roll(times=librosa.frames_to_time(
+            np.arange(max_frame), sr=MIDI_FS, hop_length=MIDI_HOP))
+        midi_gram = midi_gram[NOTE_START:NOTE_START + N_NOTES]
+        midi_sync_gram = librosa.feature.sync(
+            midi_gram,
+            librosa.time_to_frames(beats, sr=MIDI_FS, hop_length=MIDI_HOP),
+            pad=False)
+        midi_sync_gram = midi_sync_gram.T
+        midi_sync_gram = librosa.util.normalize(midi_sync_gram, norm=2, axis=1)
         # Extract audio CQT, synchronized to MIDI beats
         audio_gram = audio_features['gram']
         audio_sync_gram = alignment_utils.post_process_cqt(

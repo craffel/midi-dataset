@@ -45,18 +45,21 @@ def process_one_file(midi_filename, skip=True):
     if skip and os.path.exists(output_filename):
         return
     try:
-        m = pretty_midi.PrettyMIDI(midi_filename)
-        midi_audio = alignment_utils.fast_fluidsynth(m, MIDI_FS)
-        midi_gram = librosa.cqt(
-            midi_audio, sr=MIDI_FS, hop_length=MIDI_HOP,
-            fmin=librosa.midi_to_hz(NOTE_START), n_bins=N_NOTES)
-        midi_beats, midi_tempo = alignment_utils.midi_beat_track(m)
-        midi_sync_gram = alignment_utils.post_process_cqt(
-            midi_gram, librosa.time_to_frames(
-                midi_beats, sr=MIDI_FS, hop_length=MIDI_HOP))
+        pm = pretty_midi.PrettyMIDI(midi_filename)
+        max_frame = int(pm.get_end_time()*MIDI_FS/MIDI_HOP)
+        midi_gram = pm.get_piano_roll(times=librosa.frames_to_time(
+            np.arange(max_frame), sr=MIDI_FS, hop_length=MIDI_HOP))
+        midi_gram = midi_gram[NOTE_START:NOTE_START + N_NOTES]
+        beats, tempo = alignment_utils.midi_beat_track(pm)
+        midi_sync_gram = librosa.feature.sync(
+            midi_gram,
+            librosa.time_to_frames(beats, sr=MIDI_FS, hop_length=MIDI_HOP),
+            pad=False)
+        midi_sync_gram = midi_sync_gram.T
+        midi_sync_gram = librosa.util.normalize(midi_sync_gram, norm=2, axis=1)
         np.savez_compressed(
             output_filename, sync_gram=midi_sync_gram,
-            beats=midi_beats, bpm=midi_tempo)
+            beats=beats, bpm=tempo)
     except Exception as e:
         print "Error processing {}: {}".format(midi_filename, e)
 
