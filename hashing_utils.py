@@ -293,14 +293,22 @@ def build_network(input_shape, num_filters, filter_size, ds,
     layers = [lasagne.layers.InputLayer(shape=input_shape)]
     # Add each convolutional and pooling layer recursively
     for n in xrange(len(num_filters)):
+        # In order to get the same shape out from each convolutional layer, we
+        # need to pad the input because Conv2DLayer uses 'valid' convolution by
+        # default and we can't rely on Conv2DLayer's mode='same' because it
+        # doesn't allow even filter sizes.
+        layers.append(lasagne.layers.PadLayer(
+            layers[-1], width=((int(np.ceil((filter_size[n][0] - 1) / 2.)),
+                                int(np.floor((filter_size[n][0] - 1) / 2.))),
+                               (int(np.ceil((filter_size[n][1] - 1) / 2.)),
+                                int(np.floor((filter_size[n][1] - 1) / 2.))))))
         # We will initialize weights to \sqrt{2/n_l}
         n_l = num_filters[n]*np.prod(filter_size[n])
         layers.append(lasagne.layers.Conv2DLayer(
             layers[-1], stride=(1, 1), num_filters=num_filters[n],
             filter_size=filter_size[n],
             nonlinearity=lasagne.nonlinearities.rectify,
-            W=lasagne.init.Normal(np.sqrt(2./n_l)),
-            pad='same'))
+            W=lasagne.init.Normal(np.sqrt(2./n_l))))
         layers.append(lasagne.layers.MaxPool2DLayer(
             layers[-1], ds[n], ignore_border=False))
     # A dense layer will treat any dimensions after the first as feature
