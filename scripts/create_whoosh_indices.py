@@ -9,25 +9,28 @@ if not os.path.exists('data/cal500/index/'):
     whoosh_search.create_index('data/cal500/index/',
         read_sv.get_sv_list('file_lists/cal500.txt',
                             field_indices=[0, 1, 2]))
+
 if not os.path.exists('data/cal10k/index/'):
     # cal10k's ID field is non-contiguous.  What a pain!
     cal10k_list = read_sv.get_sv_list(
-        'file_lists/EchoNestTrackIDs.tab', skiplines=1, field_indices=[1, 2])
+        'file_lists/cal10k.txt', skiplines=1, field_indices=[1, 2])
     cal10k_list = [[unicode(n), r[0], r[1]] for n, r in enumerate(cal10k_list)]
     whoosh_search.create_index('data/cal10k/index/', cal10k_list)
 
 if not os.path.exists('data/msd/index/'):
     whoosh_search.create_index('data/msd/index/',
-        read_sv.get_sv_list('file_lists/unique_tracks.txt',
+        read_sv.get_sv_list('file_lists/msd.txt',
                             delimiter='<SEP>',
                             field_indices=[0, 2, 3]))
+
 if not os.path.exists('data/clean_midi/index'):
     whoosh_search.create_index('data/clean_midi/index',
         read_sv.get_sv_list('file_lists/clean_midi.txt',
                             field_indices=[0, 1, 2]))
+
 if not os.path.exists('data/uspop2002/index'):
     whoosh_search.create_index('data/uspop2002/index',
-        read_sv.get_sv_list('file_lists/uspop2002_no_live.txt',
+        read_sv.get_sv_list('file_lists/uspop2002.txt',
                             field_indices=[0, 1, 3]))
 
 artist = 'bon jovi'
