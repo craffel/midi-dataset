@@ -1,0 +1,504 @@
+0	10cc	for you and i
+1	2pac	trapped
+2	5th dimension	one less bell to answer
+3	aaron neville	tell it like it is
+4	abba	s.o.s.
+5	abc	poison arrow
+6	ac dc	dirty deeds done dirt cheap
+7	adam and the ants	prince charming
+8	adam ant	wonderful
+9	adverts	gary gilmores eyes
+10	aerobic jonquil	sweat machine
+11	aerosmith	dude looks like a lady
+12	aimee mann	wise up
+13	air	sexy boy
+14	alanis morissette	thank u
+15	al green	sha-la-la make me happy
+16	alice cooper	elected
+17	alice in chains	no excuses
+18	alicia keys	fallin
+19	allman brothers band	melissa
+20	altered images	dont talk to me about love
+21	american music club	jesus hands
+22	andrews sisters	boogie woogie bugle boy
+23	ani difranco	crime for crime
+24	animals	im crying
+25	anita baker	caught up in the rapture
+26	antiguru	peering
+27	antonio carlos jobim	wave
+28	anup	life glides
+29	aphex twin	come to daddy
+30	apples in stereo	glowworm
+31	aretha franklin	dont play that song
+32	arlo guthrie	alices restaurant massacree
+33	artemis	don t look back
+34	arthur alexander	you dont care
+35	arthur yoria	at least you ve been told
+36	art tatum	willow weep for me
+37	ashford and simpson	solid
+38	association	windy
+39	atomic opera	watergrave
+40	a tribe called quest	bonita applebum
+41	backstreet boys	as long as you love me
+42	badly drawn boy	all possibilities
+43	band	king harvest has surely come
+44	barbara leoni	don t rain on my parade
+45	barenaked ladies	its all been done
+46	barry manilow	mandy
+47	barry white	cant get enough of your love babe
+48	bauhaus	ziggy stardust
+49	bay city rollers	saturday night
+50	b.b. king	sweet little angel
+51	beach boys	i get around
+52	beatles	strawberry fields forever
+53	beatundercontrol	this is beatundercontrol
+54	beautiful south	one last love song
+55	beck	where its at
+56	bee gees	stayin alive
+57	belief systems	skunk werks
+58	belle and sebastian	like dylan in the movies
+59	ben folds five	brick
+60	beth quist	survival
+61	big star	in the street
+62	billie holiday	god bless the child
+63	billy bragg	jeane
+64	billy joel	we didnt start the fire
+65	birthday party	mr. clarinet
+66	bjrk	army of me
+67	black crowes	thorn in my pride
+68	black flag	six pack
+69	black sabbath	black sabbath
+70	blind faith	had to cry today
+71	blind melon	no rain
+72	blondie	rapture
+73	blood sweat and tears	sometimes in winter
+74	blue yster cult	burnin for you
+75	blur	country house
+76	bobby brown	my prerogative
+77	bobby fuller four	i fought the law
+78	bobby womack	womans gotta have it
+79	bob dylan	ill be your baby tonight
+80	bob marley and the wailers	three little birds
+81	bob seger	turn the page
+82	bo diddley	you cant judge a book by its cover
+83	bomb the bass	bug powder dust
+84	bon jovi	livin on a prayer
+85	bonnie tyler	total eclipse of the heart
+86	boogie down productions	the bridge is over
+87	booker t. and the mgs	time is tight
+88	boo radleys	wake up boo
+89	boston	more than a feeling
+90	bots	take the power back
+91	brad sucks	overreacting
+92	bread	if
+93	breeders	cannonball
+94	brenton wood	lovey dovey kind of love
+95	brian eno	here come the warm jets
+96	britney spears	im a slave for you
+97	bruce springsteen	badlands
+98	bryan adams	cuts like a knife
+99	buddy holly	peggy sue
+100	buena vista social club	el cuarto de tula
+101	buffalo springfield	for what its worth
+102	buffalo springfield	mr. soul
+103	buggles	video killed the radio star
+104	built to spill	i would hurt a fly
+105	burnshee thornside	goodbye on a beautiful day
+106	bush	comedown
+107	busta rhymes	woo hah got you all in check
+108	buzzcocks	everybodys happy nowadays
+109	byrds	wasnt born to follow
+110	cab calloway	minnie the moocher
+111	cake	perhaps, perhaps, perhaps
+112	camper van beethoven	take the skinheads bowling
+113	canned heat	on the road again
+114	captain beefheart and the magic band	safe as milk
+115	cardigans	lovefool
+116	cargo cult	garden
+117	carl perkins	matchbox
+118	carly simon	youre so vain
+119	carole king	youve got a friend
+120	carpenters	rainy days and mondays
+121	cars	good times roll
+122	catherine wheel	black metallic
+123	cat power	he war
+124	cc music factory	gonna make you sweat everybody dance now
+125	chad and jeremy	before and after
+126	chantal kreviazuk	surrounded
+127	charles mingus	mood indigo
+128	charlie parker	ornithology
+129	charlie rich	behind closed doors
+130	cheap trick	dream police
+131	chemical brothers	setting sun
+132	cheryl ann fulton	marsh of rhuddlan
+133	chet baker	these foolish things
+134	chicago	if you leave me now
+135	chic	le freak
+136	chi-lites	stoned out of my mind
+137	chills	i love my leather jacket
+138	chris juergensen	prospects
+139	christina aguilera	genie in a bottle
+140	chuck berry	roll over beethoven
+141	chumbawamba	tubthumping
+142	church	under the milky way
+143	cilla black	alfie
+144	clarence ashley	the house carpenter
+145	clash	lost in the supermarket
+146	c layne	devil and the woman
+147	coasters	poison ivy
+148	coldplay	clocks
+149	contours	do you love me
+150	count basie	lester leaps in
+151	counting crows	speedway
+152	cowboy junkies	postcard blues
+153	cranberries	linger
+154	cream	tales of brave ulysses
+155	creedence clearwater revival	travelin band
+156	crosby stills and nash	guinnevere
+157	crosby stills nash and young	teach your children
+158	curandero	aras
+159	cure	just like heaven
+160	curtis mayfield	move on up
+161	cyndi lauper	money changes everything
+162	cypress hill	lowrider
+163	daft punk	da funk
+164	darkness	i believe in a thing called love
+165	dave matthews band	ants marching
+166	david bowie	song for bob dylan
+167	dead kennedys	chemical warfare
+168	def leppard	pour some sugar on me
+169	de la soul	eye know
+170	dennis brown	tribulation
+171	depeche mode	world in my eyes
+172	devo	girl u want
+173	diana ross and the supremes	where did our love go
+174	dido	here with me
+175	dionne warwick	walk on by
+176	dire straits	money for nothing
+177	django reinhardt	brazil
+178	dj jazzy jeff and the fresh prince	summertime
+179	dj markitos	sunset 138 bpm remix
+180	domased	too slow
+181	donovan	catch the wind
+182	doobie brothers	china grove
+183	doors	touch me
+184	dr. dre	nuthin but a g thang
+185	drevo	our watcher show us the way
+186	dr kuch	persuaders dub
+187	drop trio	slapjack
+188	duke ellington and his orchestra	caravan
+189	duncan sheik	barely breathing
+190	duran duran	come undone
+191	eagles	tequila sunrise
+192	earth wind and fire	september
+193	eels	cancer for the cure
+194	electric frankenstein	teenage shutdown
+195	elliott smith	baby britain
+196	elton john	tiny dancer
+197	elvis costello	less than zero
+198	elvis presley	heartbreak hotel
+199	eminem	my fault
+200	emma s mini	lost
+201	erasure	chains of love
+202	eric clapton	wonderful tonight
+203	etherine	never leave
+204	eurythmics	sweet dreams
+205	evanescence	my immortal
+206	everly brothers	take a message to mary
+207	faith hill	lets make love
+208	faith no more	epic
+209	falik	bliss
+210	fiona apple	love ridden
+211	fleetwood mac	say you love me
+212	flying burrito brothers	break my mind
+213	foo fighters	big me
+214	four stones	brilliant day eine kleine mix
+215	frank sinatra	fly me to the moon
+216	frank zappa	whats the ugliest part of your body
+217	franz ferdinand	come on home
+218	garbage	hammering in my head
+219	gene clark	the true one
+220	genesis	cuckoo cocoon
+221	george harrison	all things must pass
+222	germs	lexicon devil
+223	gin blossoms	hey jealousy
+224	glen bledsoe	p pop
+225	glenn miller	in the mood
+226	gloria gaynor	i will survive
+227	go-gos	vacation
+228	gram parsons	1000 wedding
+229	grateful dead	high time
+230	grayson wray	heaven s the place
+231	green day	longview
+232	guided by voices	kicker of elves
+233	guns n roses	november rain
+234	hall and oates	private eyes
+235	howlin wolf	moanin at midnight
+236	human response	angels
+237	hybris	hate
+238	ike and tina turner	river deep mountain high
+239	indidginus	dusty lands
+240	interpol	stella was a diver and she was always down
+241	introspekt	tbd
+242	ivilion	d b l
+243	jackalopes	rotgut
+244	jackson 5	abc
+245	jacques brel	les vieux
+246	jade leary	going in
+247	jag	jag s rag
+248	james brown	give it up or turnit a loose
+249	james taylor	fire and rain
+250	jamie janover	event horizon
+251	jamiroquai	little l
+252	jan and dean	surf city
+253	janes addiction	been caught stealing
+254	janet jackson	miss you much
+255	jay kishor	raga malgunji jor
+256	jeff buckley	last goodbye
+257	jefferson airplane	somebody to love
+258	jerry lee lewis	great balls of fire
+259	jesse manno	alf leyla wa leyla
+260	jewel	enter from the east
+261	jimi hendrix	highway chile
+262	john cale	pablo picasso
+263	john coltrane	giant steps
+264	john lee hooker	boom boom
+265	john lennon	imagine
+266	johnny cash	the man comes around
+267	joram	solipsism
+268	joy division	love will tear us apart
+269	junior murvin	police and thieves
+270	kansas	carry on wayward son
+271	kanye west	gold digger
+272	kenji williams	i m alive
+273	king crimson	thela hun ginjeet
+274	kiss	deuce
+275	kokoon	order
+276	kool and the gang	funky stuff
+277	kourosh zolani	peaceful planet
+278	kraftwerk	spacelab
+279	kris kristofferson	the best of all possible worlds
+280	lambert hendricks and ross	gimme that wine
+281	led zeppelin	immigrant song
+282	leonard cohen	suzanne
+283	lisa debenedictis	fruitless
+284	live	lightning crashes
+285	liz phair	supernova
+286	ll cool j	mama said knock you out
+287	los lobos	corrido 1
+288	louis armstrong	hotter than that
+289	lou reed	walk on the wild side
+290	love and rockets	mirror people
+291	love	you set the scene
+292	lynyrd skynyrd	sweet home alabama
+293	macy gray	i try
+294	madness	baggy trousers
+295	madonna	ray of light
+296	mamas and the papas	words of love
+297	manassas	bound to fall
+298	marvelettes	please mr. postman
+299	marvin gaye	whats going on
+300	mary wells	my guy
+301	massive attack	risingson
+302	mazzy star	fade into you
+303	mc hammer	u cant touch this
+304	memories of tomorrow	transcend fate of a dj
+305	men at work	who can it be now
+306	metallica	one
+307	michael jackson	billie jean
+308	michael masley	advice from the angel of thresholds
+309	miles davis	blue in green
+310	moby	porcelain
+311	modest mouse	what people are made of
+312	monkees	a little bit me a little bit you
+313	monoide	golden key
+314	morrissey	everyday is like sunday
+315	mose allison	monsters of the id
+316	mott the hoople	roll away the stone
+317	mrdc	leaving
+318	mr epic	ruff and tumble
+319	mr gelatine	knysnamushrooms
+320	muddy waters	im ready
+321	muddy waters	mannish boy
+322	my bloody valentine	when you sleep
+323	myles cochran	getting stronger
+324	napoleon blown aparts	higher education
+325	natalie imbruglia	torn
+326	neil young and crazy horse	western hero
+327	neil young	razor love
+328	nelly	country grammar
+329	neutral milk hotel	where youll find me now
+330	new order	blue monday
+331	nine inch nails	head like a hole
+332	nirvana	aneurysm
+333	no doubt	artificial sweetener
+334	no doubt	simple kind of life
+335	norah jones	dont know why
+336	norine braun	spanish banks
+337	nova express	i m alive
+338	oasis	supersonic
+339	ojays	livin for the weekend
+340	olivia tremor control	i have been floated
+341	otis redding	mr. pitiful
+342	outkast	ms. jackson
+343	panacea	dragaicuta
+344	pantera	becoming
+345	paul mccartney	ebony and ivory
+346	pearl jam	yellow ledbetter
+347	pet shop boys	being boring
+348	pink floyd	echoes
+349	pink floyd	echoes 15
+350	pixies	wave of mutilation
+351	pizzle	what s wrong with my footm
+352	pj harvey	dry
+353	police	every little thing she does is magic
+354	portishead	all mine
+355	pretenders	day after day
+356	primus	jerry was a race car driver
+357	processor	nibtal 7
+358	propellerheads	take california
+359	psychedelic furs	love my way
+360	psychetropic	dead slow day
+361	queen	we will rock you
+362	radiohead	karma police
+363	rage against the machine	maggies farm
+364	rajdhani quartet	raga hansa kalyani
+365	ramones	i just want to have something to do
+366	randy newman	sail away
+367	ray charles	hit the road jack
+368	red hot chili peppers	give it away
+369	r.e.m.	camera
+370	replacements	answering machine
+371	rick james	super freak
+372	robert johnson	sweet home chicago
+373	rocket city riot	mine tonite
+374	rolling stones	little by little
+375	ronettes	walking in the rain
+376	roots of rebellion	legend
+377	roxy music	love is the drug
+378	roy orbison	running scared
+379	rubn gonzlez	cumbanchero
+380	rufus wainwright	cigarettes and chocolate milk
+381	sade	smooth operator
+382	santana	love of my life
+383	sarah mclachlan	possession
+384	saros	prelude
+385	scott hill	silk road
+386	screaming trees	nearly lost you
+387	sebadoh	soul and fire
+388	seismic anamoly	wreckinball
+389	sex pistols	pretty vacant
+390	shakira	the one
+391	shane jackman	set fire to the city
+392	sheryl crow	i shall believe
+393	shins	new slang
+394	shira kammen	music of waters
+395	shiva in exile	hollow earth
+396	shuggie otis	sweet thang
+397	simon and garfunkel	the only living boy in new york
+398	sinad oconnor	no mans woman
+399	sir mix-a-lot	baby got back
+400	skitzo	last depression
+401	sly and the family stone	just like a baby
+402	small faces	lazy sunday
+403	smashing pumpkins	rocket
+404	smithereens	behind the wall of sleep
+405	smiths	how soon is now
+406	smokey robinson and the miracles	ooo baby baby
+407	smokey robinson	cruisin
+408	snoop doggy dogg	gin and juice
+409	solace	laz 7 8
+410	somadrone	coda
+411	sonic youth	teen age riot
+412	sonny rollins	strode rode
+413	soul ii soul	keep on movin
+414	soulprint	crawlspace
+415	soundgarden	black hole sun
+416	specials	gangsters
+417	spencer davis group	gimme some lovin
+418	spice girls	stop
+419	spinecar	stay
+420	spiritualized	stop your crying
+421	squarepusher	a journey to reedham (7am mix)
+422	squeeze	pulling mussels from the shell
+423	standells	dirty water
+424	stan getz	corcovado quiet nights of quiet stars
+425	starship	nothings gonna stop us now
+426	steely dan	rikki dont lose that number
+427	steppenwolf	born to be wild
+428	stereolab	cybeles reverie
+429	stevie ray vaughan	pride and joy
+430	stevie wonder	for once in my life
+431	sting	big lie small world
+432	stone roses	i wanna be adored
+433	stooges	dirt
+434	stranglers	golden brown
+435	strawbs	new world
+436	strojovna 07	130
+437	style council	headstart for happiness
+438	sundays	heres where the story ends
+439	superchunk	slack motherfucker
+440	sweet	fox on the run
+441	syd barrett	effervescing elephant
+442	sylvester	you make me feel mighty real
+443	syreeta	what love has joined together
+444	talking heads	and she was
+445	tears for fears	everybody wants to rule the world
+446	teenage fanclub	the concept
+447	television	venus
+448	temptations	since i lost my baby
+449	thelonious monk	epistrophy
+450	they might be giants	i should be allowed to think
+451	thin lizzy	dont believe a word
+452	third eye blind	semi-charmed life
+453	throwing muses	hate my way
+454	thursday group	like white on rice
+455	tilopa	kyo rei
+456	tim buckley	morning glory
+457	tim hardin	dont make promises
+458	tim rayborn	yedi tekrar
+459	todd rundgren	bang the drum all day
+460	tommy james and the shondells	i think were alone now
+461	tom paul	little part of me
+462	tom petty and the heartbreakers	dont come around here no more
+463	tom petty	i wont back down
+464	tom waits	time
+465	tori amos	professional widow
+466	touchinggrace	wild spring apples
+467	traffic	pearly queen
+468	t. rex	children of the revolution
+469	tricky	christiansands
+470	troggs	wild thing
+471	turtles	elenore
+472	u2	hold me thrill me kiss me kill me
+473	ultravox	dancing with tears in my eyes
+474	uncle tupelo	the long cut
+475	urge overkill	sister havana
+476	utopia banished	by mourning
+477	van halen	aint talkin bout love
+478	van morrison	and it stoned me
+479	vapors	turning japanese
+480	velvet underground	new age
+481	version	universal humans
+482	very large array	psychedelic baby
+483	violent femmes	blister in the sun
+484	war	all day music
+485	weezer	buddy holly
+486	wes montgomery	bumpin
+487	west exit	nocturne
+488	white stripes	hotel yorba
+489	whitney houston	how will i know
+490	who	bargain
+491	wicked allstars	happy
+492	wicked boy	pressure
+493	wilco	kingpin
+494	williamson	whats on the ceiling beats whats on tv
+495	xtc	love at first sight
+496	yakshi	chandra
+497	yeah yeah yeahs	maps
+498	yes	leave it
+499	yo la tengo	tom courtenay
+500	young mc	bust a move
+501	young rascals	baby lets wait
+502	zapp	dance floor
+503	zombies	beechwood park
