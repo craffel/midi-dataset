@@ -27,7 +27,8 @@ def create_index_writer(index_path):
          whoosh.analysis.CharsetFilter(accent_map))
 
     Schema = whoosh.fields.Schema(
-        track_id=whoosh.fields.ID(stored=True),
+        id=whoosh.fields.ID(stored=True),
+        path=whoosh.fields.TEXT(stored=True),
         artist=whoosh.fields.TEXT(stored=True, analyzer=A),
         title=whoosh.fields.TEXT(stored=True, analyzer=A))
 
@@ -44,15 +45,14 @@ def create_index(index_path, track_list):
         - index_path : str
             where to create the whoosh index
         - track_list : list of list of str
-            list of lists, each list contains track_id, artist, title
+            list of dicts, each dict should have keys 'id', 'path', 'artist',
+            and 'title'
     '''
 
     writer = create_index_writer(index_path)
 
-    for (track_id, artist_name, song_name) in track_list:
-        writer.add_document(track_id=track_id,
-                            artist=artist_name,
-                            title=song_name)
+    for entry in track_list:
+        writer.add_document(**entry)
 
     writer.commit()
     pass
@@ -106,7 +106,7 @@ def search(searcher, schema, artist, title, threshold=20):
     results = searcher.search(q)
 
     if len(results) > 0:
-        return [[r['track_id'], r['artist'], r['title']] for r in results if
+        return [[r['id'], r['artist'], r['title']] for r in results if
                 r.score > threshold]
     else:
         return []
