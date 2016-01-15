@@ -198,12 +198,15 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
         # Non-diagonal additive path penalty is the median of the sim mtx
         add_pen = np.median(similarity_matrix)
         # Get best path through matrix
-        p, q, score = djitw.dtw(similarity_matrix, gully=.96,
-                                additive_penalty=add_pen, inplace=False)
+        aligned_midi_indices, aligned_audio_indices, score = djitw.dtw(
+            similarity_matrix, gully=.96, additive_penalty=add_pen,
+            inplace=False)
         # Normalize score by path length
-        score /= float(len(p))
+        score /= float(len(aligned_midi_indices))
         # Normalize score by score by mean sim matrix value within path chunk
-        score /= similarity_matrix[p.min():p.max(), q.min():q.max()].mean()
+        score /= similarity_matrix[
+            aligned_midi_indices.min():aligned_midi_indices.max(),
+            aligned_audio_indices.min():aligned_audio_indices.max()].mean()
     except Exception as e:
         print "Error performing DTW for {} and {}: {}".format(
             os.path.split(audio_filename)[1],
@@ -215,9 +218,12 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
     if output_midi_filename is not None:
         try:
             # Adjust MIDI timing
-            m.adjust_times(
-                feature_extraction.frame_times(midi_features['gram'])[p],
-                feature_extraction.frame_times(audio_features['gram'])[q])
+            midi_frame_times = feature_extraction.frame_times(
+                midi_features['gram'])
+            audio_frame_times = feature_extraction.frame_times(
+                audio_features['gram'])
+            m.adjust_times(midi_frame_times[aligned_midi_indices],
+                           audio_frame_times[aligned_audio_indices])
             check_subdirectories(output_midi_filename)
             m.write(output_midi_filename)
         except Exception as e:
@@ -232,7 +238,8 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
             if additional_diagnostics is None:
                 additional_diagnostics = {}
             diagnostics = dict(
-                p=p, q=q, score=score,
+                aligned_midi_indices=aligned_midi_indices,
+                aligned_audio_indices=aligned_audio_indices, score=score,
                 audio_filename=os.path.abspath(audio_filename),
                 midi_filename=os.path.abspath(midi_filename),
                 audio_features_filename=os.path.abspath(
@@ -249,7 +256,7 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
                 os.path.split(audio_filename)[1],
                 os.path.split(midi_filename)[1], traceback.format_exc(e))
             return
-    return p, q, score
+    return aligned_midi_indices, aligned_audio_indices, score
 
 
 if __name__ == '__main__':
