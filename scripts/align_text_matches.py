@@ -60,7 +60,8 @@ def check_subdirectories(filename):
 
 def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
                    midi_features_filename=None, output_midi_filename=None,
-                   output_diagnostics_filename=None):
+                   output_diagnostics_filename=None,
+                   additional_diagnostics=None):
     '''
     Helper function for aligning a MIDI file to an audio file.
 
@@ -84,6 +85,9 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
     output_diagnostics_filename : str or None
         Full path to a file to write out diagnostic information (similarity
         matrix, best path, etc) in a .h5 file.  If None, don't output.
+    additional_diagnostics : dict or None
+        Optional dictionary of additional diagnostic information to include
+        in the diagnostics file.  If None, don't include.
 
     Returns
     -------
@@ -224,6 +228,9 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
     if output_diagnostics_filename is not None:
         try:
             check_subdirectories(output_diagnostics_filename)
+            # Construct empty additional diagnostics dict when None was given
+            if additional_diagnostics is None:
+                additional_diagnostics = {}
             diagnostics = dict(
                 p=p, q=q, score=score,
                 audio_filename=os.path.abspath(audio_filename),
@@ -233,7 +240,8 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
                 midi_features_filename=os.path.abspath(midi_features_filename),
                 output_midi_filename=os.path.abspath(output_midi_filename),
                 output_diagnostics_filename=os.path.abspath(
-                    output_diagnostics_filename))
+                    output_diagnostics_filename),
+                **additional_diagnostics)
             hickle.dump(
                 diagnostics, output_diagnostics_filename, compression='gzip')
         except Exception as e:
@@ -295,9 +303,11 @@ if __name__ == '__main__':
             output_path, output_basename, 'mid')
         output_diagnostics_filename = path_to_file(
             output_path, output_basename, 'h5')
+        additional_diagnostics = {
+            'audio_dataset': dataset, 'audio_id': id, 'midi_md5': midi_md5}
         pairs.append((audio_filename, midi_filename, audio_features_filename,
                       midi_features_filename, output_midi_filename,
-                      output_diagnostics_filename))
+                      output_diagnostics_filename, additional_diagnostics))
 
     # Run alignment
     joblib.Parallel(n_jobs=10, verbose=51)(
