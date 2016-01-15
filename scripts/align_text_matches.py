@@ -207,6 +207,11 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
         score /= similarity_matrix[
             aligned_midi_indices.min():aligned_midi_indices.max(),
             aligned_audio_indices.min():aligned_audio_indices.max()].mean()
+        # The confidence score is a normalized DTW distance, which
+        # approximately follows in the range [.5, 1.] with .5 meaning a very
+        # good alignment.  This maps the scores from [0., 1.] where 1. means a
+        # very good alignment.
+        score = np.clip(2*(1 - score), 0, 1)
     except Exception as e:
         print "Error performing DTW for {} and {}: {}".format(
             os.path.split(audio_filename)[1],
