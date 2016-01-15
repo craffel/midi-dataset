@@ -83,8 +83,9 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
         Full path to where the aligned .mid file should be written.
         If None, don't output.
     output_diagnostics_filename : str or None
-        Full path to a file to write out diagnostic information (similarity
-        matrix, best path, etc) in a .h5 file.  If None, don't output.
+        Full path to a file to write out diagnostic information (alignment
+        score, best path, paths to files, etc) in a .h5 file.  If None, don't
+        output.
     additional_diagnostics : dict or None
         Optional dictionary of additional diagnostic information to include
         in the diagnostics file.  If None, don't include.
@@ -179,12 +180,12 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
                 return
 
     try:
-        # Check that the similarity matrix will not be too big before computing
+        # Check that the distance matrix will not be too big before computing
         size = midi_features['gram'].shape[0]*audio_features['gram'].shape[0]
         # If > 1 GB, skip
         if (size*64/8e9 > 1):
             print (
-                "Similarity matrix for {} and {} would be {} GB because the "
+                "Distance matrix for {} and {} would be {} GB because the "
                 "CQTs have shape {} and {}".format(
                     os.path.split(audio_filename)[1],
                     os.path.split(midi_filename)[1],
@@ -192,19 +193,19 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
                     midi_features['gram'].shape[0]))
             return
 
-        # Get similarity matrix
-        similarity_matrix = 1 - np.dot(
+        # Get distance matrix
+        distance_matrix = 1 - np.dot(
             midi_features['gram'], audio_features['gram'].T)
         # Non-diagonal additive path penalty is the median of the sim mtx
-        add_pen = np.median(similarity_matrix)
+        add_pen = np.median(distance_matrix)
         # Get best path through matrix
         aligned_midi_indices, aligned_audio_indices, score = djitw.dtw(
-            similarity_matrix, gully=.96, additive_penalty=add_pen,
+            distance_matrix, gully=.96, additive_penalty=add_pen,
             inplace=False)
         # Normalize score by path length
         score /= float(len(aligned_midi_indices))
         # Normalize score by score by mean sim matrix value within path chunk
-        score /= similarity_matrix[
+        score /= distance_matrix[
             aligned_midi_indices.min():aligned_midi_indices.max(),
             aligned_audio_indices.min():aligned_audio_indices.max()].mean()
         # The confidence score is a normalized DTW distance, which
