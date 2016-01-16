@@ -17,12 +17,15 @@ import joblib
 import subprocess
 import whoosh_search
 import collections
+import shutil
 
 # Pre-load the MSD index as a list
 MSD_IDX = whoosh_search.get_whoosh_index(
     os.path.join('..', 'data', 'msd', 'index'))
 with MSD_IDX.searcher() as searcher:
     MSD_LIST = dict((e['id'], e) for e in searcher.documents())
+# Threshold above which alignments are considered correct
+SCORE_THRESHOLD = .5
 
 
 def interpolate_times(times, old_timebase, new_timebase, labels=None,
@@ -88,53 +91,34 @@ def interpolate_times(times, old_timebase, new_timebase, labels=None,
         return interped_times, valid_labels
 
 
-def extract_ground_truth(diagnostics_files, score_threshold,
-                         output_jams_filename):
+def extract_ground_truth(diagnostics_group):
     """
     Extract ground-truth information from one or more MIDI files about a single
-    MIDI file based on the results in one or more diagnostics files and write
-    out the result when each alignment was successful.
+    MIDI file based on the results in one or more diagnostics files and return
+    a JAMS object with all of the annotations compiled.
 
     Parameters
     ----------
-    - diagnostics_files : list of str
-        List of paths to a file containing diagnostics about one or more
-        alignments to a single audio file.
-    - score_threshold : float
-        An alignment will be considered correct if the DTW confidence score is
-        smaller than this.
-    - output_jams_filename : str
-        Where to write the JAMS file containing pseudo-ground-truth
-        annotations when alignment was successful.
+    - diagnostics_group : list of dict
+        List of dicts of diagnostics, each about a successful alignment of a
+        different MIDI file to a single audio file.
     """
     # Construct the JAMS object
     jam = jams.JAMS()
-    # Check ahead of time for any valid alignments.  We do this here to avoid
-    # having to load the audio file multiple times to get its duration
-    if any(hickle.load(f)['score'] > score_threshold
-           for f in diagnostics_files):
-        # Load in the first diagnostics (doesn't matter which as they all
-        # should correspond the same audio file)
-        diagnostics = hickle.load(diagnostics_files[0])
-        # Load in the audio file to get its duration for the JAMS file
-        audio, fs = librosa.load(
-            diagnostics['audio_filename'], feature_extraction.AUDIO_FS)
-        jam.file_metadata.duration = librosa.get_duration(y=audio, sr=fs)
-        # Also store metadata about the audio file, retrieved from the MSD
-        jam.file_metadata.identifiers = {'track_id': diagnostics['audio_id']}
-        jam.file_metadata.artist = MSD_LIST[diagnostics['audio_id']]['artist']
-        jam.file_metadata.title = MSD_LIST[diagnostics['audio_id']]['title']
-    # If no alignments were valid, quit early
-    else:
-        return
+    # Load in the first diagnostics (doesn't matter which as they all
+    # should correspond the same audio file)
+    diagnostics = diagnostics_group[0]
+    # Load in the audio file to get its duration for the JAMS file
+    audio, fs = librosa.load(
+        diagnostics['audio_filename'], feature_extraction.AUDIO_FS)
+    jam.file_metadata.duration = librosa.get_duration(y=audio, sr=fs)
+    # Also store metadata about the audio file, retrieved from the MSD
+    jam.file_metadata.identifiers = {'track_id': diagnostics['audio_id']}
+    jam.file_metadata.artist = MSD_LIST[diagnostics['audio_id']]['artist']
+    jam.file_metadata.title = MSD_LIST[diagnostics['audio_id']]['title']
 
     # Iterate over the diagnostics files supplied
-    for diagnostics_file in diagnostics_files:
-        # Load in alignment diagnostics
-        diagnostics = hickle.load(diagnostics_file)
-        # If the alignment was incorrect, quit
-        if diagnostics['score'] <= score_threshold:
-            continue
+    for diagnostics in diagnostics_group:
 
         # Create annotation metadata object, shared across annotations
         commit = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
@@ -210,28 +194,64 @@ def extract_ground_truth(diagnostics_files, score_threshold,
                 key_a.append(time=start, duration=end - start, value=key)
             jam.annotations.append(key_a)
 
-    # Save JAMS file to disk
-    with open(output_jams_filename, 'wb') as f:
-        jam.save(f)
+    return jam
 
 if __name__ == '__main__':
-    output_jams_path = os.path.join('..', 'results', 'extracted_ground_truth')
+
+    # Output paths for JAMS, unaligned MIDI and aligned MIDI
+    output_jams_path = os.path.join(
+        '..', 'results', 'extracted_ground_truth', 'jams')
     if not os.path.exists(output_jams_path):
         os.makedirs(output_jams_path)
+    output_midi_path = os.path.join(
+        '..', 'results', 'extracted_ground_truth', 'mid')
+    if not os.path.exists(output_midi_path):
+        os.makedirs(output_midi_path)
+    output_aligned_midi_path = os.path.join(
+        '..', 'results', 'extracted_ground_truth', 'mid_aligned')
+    if not os.path.exists(output_aligned_midi_path):
+        os.makedirs(output_aligned_midi_path)
+
     # Currently grabbing results from clean_midi, eventually more
     diagnostics_path = os.path.join(
         '..', 'results', 'clean_midi_aligned', 'h5')
-    # Keep track of groups of alignments of the same MSD IDs
-    file_groups = collections.defaultdict(list)
+    # Keep track of groups of correct alignments of the same MSD IDs
+    diagnostics_groups = collections.defaultdict(list)
+    # And the MIDI
     for diagnostics_file in glob.glob(os.path.join(diagnostics_path, '*.h5')):
         diagnostics = hickle.load(diagnostics_file)
-        if diagnostics['audio_dataset'] == 'msd':
-            file_groups[diagnostics['audio_id']].append(diagnostics_file)
+        if (diagnostics['score'] > SCORE_THRESHOLD
+                and diagnostics['audio_dataset'] == 'msd'):
+            diagnostics_groups[diagnostics['audio_id']].append(diagnostics)
 
-    output_jams_files = [os.path.join(output_jams_path, id + '.jams')
-                         for id in file_groups]
-    joblib.Parallel(n_jobs=10, verbose=51)(
-        joblib.delayed(extract_ground_truth)(
-            diagnostics_files, .5, output_jams_file)
-        for diagnostics_files, output_jams_file
-        in zip(file_groups.values(), output_jams_files))
+    # Construct JAMS objects for all groups of alignments
+    jams_objects = joblib.Parallel(n_jobs=10, verbose=51)(
+        joblib.delayed(extract_ground_truth)(diagnostics_group)
+        for diagnostics_group in diagnostics_groups.values())
+
+    # Write out all results
+    for (id, diagnostics_group), jams_object in zip(diagnostics_groups.items(),
+                                                    jams_objects):
+        # Iterate over entries in the diagnostics group
+        for diagnostics in diagnostics_group:
+            # Create the subdirectory for the MSD ID if it doesn't exist
+            output_midi_id_path = os.path.join(output_midi_path, id)
+            if not os.path.exists(output_midi_id_path):
+                os.makedirs(output_midi_id_path)
+            # Copy over the unaligned MIDI
+            shutil.copy(diagnostics['midi_filename'],
+                        os.path.join(output_midi_id_path,
+                                     diagnostics['midi_md5'] + '.mid'))
+
+            # Same for aligned MIDI
+            output_aligned_midi_id_path = os.path.join(
+                output_aligned_midi_path, id)
+            if not os.path.exists(output_aligned_midi_id_path):
+                os.makedirs(output_aligned_midi_id_path)
+            shutil.copy(diagnostics['output_midi_filename'],
+                        os.path.join(output_aligned_midi_id_path,
+                                     diagnostics['midi_md5'] + '.mid'))
+
+        # Write out the JAMS file
+        with open(os.path.join(output_jams_path, id + '.jams'), 'wb') as f:
+            jams_object.save(f)
