@@ -138,7 +138,9 @@ def extract_ground_truth(diagnostics_files, score_threshold,
 
         # Create annotation metadata object, shared across annotations
         commit = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
-        annotator = {'midi_md5': diagnostics['midi_md5'], 'commit': commit,
+        commit_url = "http://github.com/craffel/midi-dataset/tree/" + commit
+        annotator = {'midi_md5': diagnostics['midi_md5'],
+                     'commit_url': commit_url,
                      'confidence': diagnostics['score']}
         annotation_metadata = jams.AnnotationMetadata(
             curator=jams.Curator('Colin Raffel', 'craffel@gmail.com'),
