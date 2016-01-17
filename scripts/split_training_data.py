@@ -9,9 +9,10 @@ import itertools
 import csv
 
 # Proportions of the dataset to use for each set
-TRAIN_VAL_THRESHOLD = .9
-DEV_TEST_THRESHOLD = .5
-TRAIN_VAL_OR_DEV_TEST = .5
+# Train = 60%, validation = 5%, development = 10%, test = 25%
+TRAIN_VAL_OR_DEV_TEST = .6 + .05
+TRAIN_VAL_THRESHOLD = .6/TRAIN_VAL_OR_DEV_TEST
+DEV_TEST_THRESHOLD = .1/(1. - TRAIN_VAL_OR_DEV_TEST)
 
 # Directory to write out results
 RESULTS_PATH = os.path.join('..', 'results')
