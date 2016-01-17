@@ -3,8 +3,6 @@ Split the hashing training data into training, validation, and test sets.
 '''
 
 import os
-import sys
-sys.path.append('..')
 import numpy as np
 import json
 import itertools
@@ -15,11 +13,11 @@ TRAIN_VAL_THRESHOLD = .9
 DEV_TEST_THRESHOLD = .5
 TRAIN_VAL_OR_DEV_TEST = .5
 
-# Directory to file lists
-FILE_LIST_PATH = '../file_lists'
+# Directory to write out results
+RESULTS_PATH = os.path.join('..', 'results')
 
 # Get list of all MIDI->mp3 pairs
-with open(os.path.join(FILE_LIST_PATH, 'text_matches.js')) as f:
+with open(os.path.join(RESULTS_PATH, 'text_matches.js')) as f:
     pairs = json.load(f)
 
 # Lists of training, validation, and test set files to be populated below
@@ -30,7 +28,7 @@ test_files = []
 
 # Each pair corresponds to all MIDIs of a song matched to all mp3s of the song
 for pair in pairs:
-    # Draw a random number to deice train/val or dev/test
+    # Draw a random number to choose train/val or dev/test
     if np.random.rand() < TRAIN_VAL_OR_DEV_TEST:
         # Draw a random number to decide train or val
         if np.random.rand() < TRAIN_VAL_THRESHOLD:
@@ -54,7 +52,7 @@ def write_list(filename, l):
         writer = csv.writer(f)
         writer.writerows(l)
 
-write_list(os.path.join(FILE_LIST_PATH, 'train_pairs.csv'), train_files)
-write_list(os.path.join(FILE_LIST_PATH, 'valid_pairs.csv'), valid_files)
-write_list(os.path.join(FILE_LIST_PATH, 'dev_pairs.csv'), dev_files)
-write_list(os.path.join(FILE_LIST_PATH, 'test_pairs.csv'), test_files)
+write_list(os.path.join(RESULTS_PATH, 'train_pairs.csv'), train_files)
+write_list(os.path.join(RESULTS_PATH, 'valid_pairs.csv'), valid_files)
+write_list(os.path.join(RESULTS_PATH, 'dev_pairs.csv'), dev_files)
+write_list(os.path.join(RESULTS_PATH, 'test_pairs.csv'), test_files)
