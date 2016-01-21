@@ -61,8 +61,8 @@ def run_trial(params):
     try:
         for epoch in dhs.train(
                 data['train']['X'], data['train']['Y'], data['valid']['X'],
-                data['valid']['Y'], layers, params['alpha_XY'], params['m_XY'],
-                updates_function):
+                data['valid']['Y'], layers, params['negative_importance'],
+                params['negative_threshold'], updates_function):
             # Stop training if a nan training cost is encountered
             if not np.isfinite(epoch['train_cost']):
                 break
@@ -99,10 +99,10 @@ if __name__ == '__main__':
     # Define hyperparameter space
     space = {
         'momentum': {'type': 'float', 'min': 0., 'max': 1.},
-        'm_XY': {'type': 'int', 'min': 1, 'max': 16},
+        'negative_threshold': {'type': 'int', 'min': 1, 'max': 16},
         'dropout': {'type': 'int', 'min': 0, 'max': 1},
         'learning_rate': {'type': 'float', 'min': .0001, 'max': .01},
-        'alpha_XY': {'type': 'float', 'min': 0.01, 'max': 1.},
+        'negative_importance': {'type': 'float', 'min': 0.01, 'max': 1.},
         'downsample_frequency': {'type': 'int', 'min': 0, 'max': 1},
         'network': {'type': 'enum', 'options': ['big_filter', 'small_filters']}
     }
