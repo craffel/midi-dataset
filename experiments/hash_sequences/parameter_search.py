@@ -103,10 +103,10 @@ if __name__ == '__main__':
     space = {
         'n_hidden': {'type': 'int', 'min': 2, 'max': 3},
         'momentum': {'type': 'float', 'min': 0., 'max': 1.},
-        'm_XY': {'type': 'int', 'min': 0, 'max': 8},
+        'm_XY': {'type': 'int', 'min': 1, 'max': 8},
         'dropout': {'type': 'int', 'min': 0, 'max': 1},
         'learning_rate': {'type': 'float', 'min': .0001, 'max': .01},
-        'alpha_XY': {'type': 'float', 'min': 0., 'max': 1.},
+        'alpha_XY': {'type': 'float', 'min': 0.01, 'max': 1.},
         'n_conv': {'type': 'int', 'min': 2, 'max': 3}}
 
     # Create parameter trials directory if it doesn't exist
