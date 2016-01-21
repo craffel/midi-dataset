@@ -3,7 +3,7 @@
 import lasagne
 import numpy as np
 
-N_BITS = 16
+N_BITS = 32
 
 
 def build_network_small_filters(input_shape, input_mean, input_std,

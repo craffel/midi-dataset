@@ -99,7 +99,7 @@ if __name__ == '__main__':
     # Define hyperparameter space
     space = {
         'momentum': {'type': 'float', 'min': 0., 'max': 1.},
-        'm_XY': {'type': 'int', 'min': 1, 'max': 8},
+        'm_XY': {'type': 'int', 'min': 1, 'max': 16},
         'dropout': {'type': 'int', 'min': 0, 'max': 1},
         'learning_rate': {'type': 'float', 'min': .0001, 'max': .01},
         'alpha_XY': {'type': 'float', 'min': 0.01, 'max': 1.},
