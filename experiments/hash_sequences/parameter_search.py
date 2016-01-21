@@ -12,6 +12,7 @@ import collections
 import lasagne
 import functools
 import sys
+import utils
 
 RESULTS_PATH = '../../results'
 
@@ -36,20 +37,16 @@ def run_trial(params):
             np.concatenate(data['train'][network], axis=1), axis=1)
         input_std = np.std(
             np.concatenate(data['train'][network], axis=1), axis=1)
-        # Use the number of convolutional layers to construct a list
-        # [16, 32 ...n_conv times]
-        num_filters = [2**(n + 4) for n in range(params['n_conv'])]
-        # First filter is 12 semitones tall, then (3 x 3) after that
-        filter_size = [(5, 12)] + [(3, 3)]*(params['n_conv'] - 1)
-        # Construct a maxpool size list
-        # [(2, 2), (2, 2), (1, 2) ...n_conv-2 times...]
-        ds = [(2, 2), (2, 2)] + [(1, 2)]*(params['n_conv'] - 2)
-        # Use the # of hidden layers and the hidden layer power to construct
-        # [2^hidden_power, 2^hidden_power, ...n_hidden times...]
-        hidden_layer_sizes = [2**11]*params['n_hidden']
-        layers[network] = dhs.build_network(
-            input_shape, input_mean, input_std, num_filters, filter_size, ds,
-            hidden_layer_sizes, params['dropout'], 16)
+        # Choose network structure based on network param
+        if params['network'] == 'big_filter':
+            build_network = utils.build_network_big_filter
+        elif params['network'] == 'small_filters':
+            build_network = utils.build_network_small_filters
+        else:
+            raise ValueError('Unknown network {}'.format(params['network']))
+        layers[network] = build_network(
+            input_shape, input_mean, input_std,
+            params['downsample_frequency'], params['dropout'])
 
     # Create updates-creating function
     updates_function = functools.partial(
@@ -101,13 +98,14 @@ def run_trial(params):
 if __name__ == '__main__':
     # Define hyperparameter space
     space = {
-        'n_hidden': {'type': 'int', 'min': 2, 'max': 3},
         'momentum': {'type': 'float', 'min': 0., 'max': 1.},
         'm_XY': {'type': 'int', 'min': 1, 'max': 8},
         'dropout': {'type': 'int', 'min': 0, 'max': 1},
         'learning_rate': {'type': 'float', 'min': .0001, 'max': .01},
         'alpha_XY': {'type': 'float', 'min': 0.01, 'max': 1.},
-        'n_conv': {'type': 'int', 'min': 2, 'max': 3}}
+        'downsample_frequency': {'type': 'int', 'min': 0, 'max': 1},
+        'network': {'type': 'enum', 'options': ['big_filter', 'small_filters']}
+    }
 
     # Create parameter trials directory if it doesn't exist
     trial_directory = os.path.join(RESULTS_PATH, 'dhs_parameter_trials')
