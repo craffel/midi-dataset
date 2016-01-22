@@ -62,7 +62,8 @@ def run_trial(params):
         for epoch in dhs.train(
                 data['train']['X'], data['train']['Y'], data['valid']['X'],
                 data['valid']['Y'], layers, params['negative_importance'],
-                params['negative_threshold'], updates_function):
+                params['negative_threshold'], params['entropy_importance'],
+                updates_function):
             # Stop training if a nan training cost is encountered
             if not np.isfinite(epoch['train_cost']):
                 break
@@ -103,6 +104,7 @@ if __name__ == '__main__':
         'dropout': {'type': 'int', 'min': 0, 'max': 1},
         'learning_rate': {'type': 'float', 'min': .0001, 'max': .01},
         'negative_importance': {'type': 'float', 'min': 0.01, 'max': 1.},
+        'entropy_importance': {'type': 'float', 'min': 0.0, 'max': 1.},
         'downsample_frequency': {'type': 'int', 'min': 0, 'max': 1},
         'network': {'type': 'enum', 'options': ['big_filter', 'small_filters']}
     }
