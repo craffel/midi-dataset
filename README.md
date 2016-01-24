@@ -2,6 +2,8 @@
 
 The goal of this project is to match and align a very large collection of MIDI files to very large collections of audio files so that the MIDI data can be used to infer ground truth information about the audio.
 
+*Note* - this repository/experiment is undergoing some restructuring, so the description below may no longer apply in places.  If you're looking for the version of this repository used in the experiments in [Large-Scale Content-Based Matching of MIDI and Audio Files](http://colinraffel.com/publications/ismir2015large.pdf), check [this tag](https://github.com/craffel/midi-dataset/releases/tag/v0.1.0).
+
 ### Datasets
 
 Each dataset is contained in a folder in `data`.  Each dataset has the following:
