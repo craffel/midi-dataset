@@ -144,7 +144,7 @@ if __name__ == '__main__':
         # Also write out the entire model when the objective is the smallest
         # We don't want to write all models; they are > 100MB each
         if (not np.isnan(best_objective) and
-                best_objective < np.min(ss.objective_values)):
+                best_objective == np.min(ss.objective_values)):
             # Unfortunately, hickle can't handle hickling a dict of lists of
             # np.ndarrays, so we need to write each model to different files
             hickle.dump(best_model['X'],
