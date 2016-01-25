@@ -7,7 +7,7 @@ import os
 import simple_spearmint
 import glob
 import traceback
-import hickle
+import deepdish
 import collections
 import lasagne
 import functools
@@ -24,7 +24,7 @@ def run_trial(params):
     data_directory = os.path.join(RESULTS_PATH, 'training_dataset')
     for set in ['train', 'valid']:
         for f in glob.glob(os.path.join(data_directory, set, 'h5', '*.h5')):
-            for k, v in hickle.load(f).items():
+            for k, v in deepdish.io.load(f).items():
                 data[set][k].append(v)
 
     # Build networks
@@ -123,7 +123,7 @@ if __name__ == '__main__':
 
     # Load in previous results for "warm start"
     for trial_file in glob.glob(os.path.join(trial_directory, '*.h5')):
-        trial = hickle.load(trial_file)
+        trial = deepdish.io.load(trial_file)
         ss.update(trial['hyperparameters'], trial['best_objective'])
 
     # Run parameter optimization forever
@@ -137,17 +137,13 @@ if __name__ == '__main__':
         # Write out a result file
         trial_filename = ','.join('{}={}'.format(k, v)
                                   for k, v in suggestion.items()) + '.h5'
-        hickle.dump(
+        deepdish.io.save(
+            os.path.join(trial_directory, trial_filename),
             {'hyperparameters': suggestion, 'best_objective': best_objective,
-             'best_epoch': best_epoch},
-            os.path.join(trial_directory, trial_filename))
+             'best_epoch': best_epoch})
         # Also write out the entire model when the objective is the smallest
         # We don't want to write all models; they are > 100MB each
         if (not np.isnan(best_objective) and
                 best_objective == np.min(ss.objective_values)):
-            # Unfortunately, hickle can't handle hickling a dict of lists of
-            # np.ndarrays, so we need to write each model to different files
-            hickle.dump(best_model['X'],
-                        os.path.join(model_directory, 'best_model_X.h5'))
-            hickle.dump(best_model['Y'],
-                        os.path.join(model_directory, 'best_model_Y.h5'))
+            deepdish.io.save(
+                os.path.join(model_directory, 'best_model.h5'), best_model)

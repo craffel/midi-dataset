@@ -11,7 +11,7 @@ import os
 import pretty_midi
 import joblib
 import feature_extraction
-import hickle
+import deepdish
 import traceback
 
 # A DP score below this means the alignment is bad
@@ -23,7 +23,7 @@ def process_one_file(diagnostics_file, output_filename):
     # If the alignment failed and there was no diagnostics file, return
     if not os.path.exists(diagnostics_file):
         return
-    diagnostics = hickle.load(diagnostics_file)
+    diagnostics = deepdish.io.load(diagnostics_file)
     score = diagnostics['score']
     # Skip bad alignments
     if score < SCORE_THRESHOLD:
@@ -35,7 +35,7 @@ def process_one_file(diagnostics_file, output_filename):
         midi_gram = feature_extraction.midi_cqt(pm)
         midi_frame_times = feature_extraction.frame_times(midi_gram)
         # Get audio CQT
-        audio_features = hickle.load(
+        audio_features = deepdish.io.load(
             str(diagnostics['audio_features_filename']))
         audio_gram = audio_features['gram']
         audio_frame_times = feature_extraction.frame_times(audio_gram)
@@ -52,9 +52,9 @@ def process_one_file(diagnostics_file, output_filename):
                                              midi_frame_times <= end_time)]
         # Write out matrices with a newaxis at front (for # of channels)
         # Also downcast to float32, to save space and for GPU-ability
-        hickle.dump({'X': midi_gram[np.newaxis].astype(np.float32),
-                     'Y': audio_gram[np.newaxis].astype(np.float32)},
-                    output_filename, compression='gzip')
+        deepdish.io.save(
+            output_filename, {'X': midi_gram[np.newaxis].astype(np.float32),
+                              'Y': audio_gram[np.newaxis].astype(np.float32)})
     except Exception as e:
         print "Error for {}: {}".format(
             diagnostics_file, traceback.format_exc(e))

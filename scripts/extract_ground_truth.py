@@ -9,7 +9,7 @@ import numpy as np
 import librosa
 import feature_extraction
 import pretty_midi
-import hickle
+import deepdish
 import jams
 import os
 import glob
@@ -145,8 +145,9 @@ def extract_ground_truth(diagnostics_group):
             data_source='Inferred from a MIDI file.')
 
         # Load the extracted features
-        midi_features = hickle.load(diagnostics['midi_features_filename'])
-        audio_features = hickle.load(diagnostics['audio_features_filename'])
+        midi_features = deepdish.io.load(diagnostics['midi_features_filename'])
+        audio_features = deepdish.io.load(
+            diagnostics['audio_features_filename'])
         # Load in the original MIDI file
         midi_object = pretty_midi.PrettyMIDI(diagnostics['midi_filename'])
         # Compute the times of the frames (will be used for interpolation)
@@ -219,7 +220,7 @@ if __name__ == '__main__':
     diagnostics_groups = collections.defaultdict(list)
     # And the MIDI
     for diagnostics_file in glob.glob(os.path.join(diagnostics_path, '*.h5')):
-        diagnostics = hickle.load(diagnostics_file)
+        diagnostics = deepdish.io.load(diagnostics_file)
         if (diagnostics['score'] > SCORE_THRESHOLD
                 and diagnostics['audio_dataset'] == 'msd'):
             diagnostics_groups[diagnostics['audio_id']].append(diagnostics)

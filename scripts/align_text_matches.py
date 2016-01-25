@@ -9,7 +9,7 @@ import itertools
 import json
 import feature_extraction
 import djitw
-import hickle
+import deepdish
 import whoosh_search
 import traceback
 
@@ -116,7 +116,7 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
             os.path.exists(midi_features_filename)):
         try:
             # If a feature file was provided and exists, read it in
-            midi_features = hickle.load(midi_features_filename)
+            midi_features = deepdish.io.load(midi_features_filename)
         # If there was a problem reading, force re-cration
         except Exception as e:
             print "Error reading {}: {}".format(
@@ -135,8 +135,8 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
             try:
                 # Write out
                 check_subdirectories(midi_features_filename)
-                hickle.dump(
-                    midi_features, midi_features_filename, compression='gzip')
+                deepdish.io.save(
+                    midi_features_filename, midi_features)
             except Exception as e:
                 print "Error writing {}: {}".format(
                     os.path.split(midi_filename)[1], traceback.format_exc(e))
@@ -149,7 +149,7 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
             os.path.exists(audio_features_filename)):
         # If a feature file was provided and exists, read it in
         try:
-            audio_features = hickle.load(audio_features_filename)
+            audio_features = deepdish.io.load(audio_features_filename)
         # If there was a problem reading, force re-cration
         except Exception as e:
             print "Error reading {}: {}".format(
@@ -172,8 +172,7 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
             try:
                 # Write out
                 check_subdirectories(audio_features_filename)
-                hickle.dump(audio_features, audio_features_filename,
-                            compression='gzip')
+                deepdish.io.save(audio_features_filename, audio_features)
             except Exception as e:
                 print "Error writing {}: {}".format(
                     os.path.split(audio_filename)[1], traceback.format_exc(e))
@@ -255,8 +254,7 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
                 output_diagnostics_filename=os.path.abspath(
                     output_diagnostics_filename),
                 **additional_diagnostics)
-            hickle.dump(
-                diagnostics, output_diagnostics_filename, compression='gzip')
+            deepdish.io.save(output_diagnostics_filename, diagnostics)
         except Exception as e:
             print "Error writing diagnostics for {} and {}: {}".format(
                 os.path.split(audio_filename)[1],
