@@ -127,7 +127,8 @@ def post_process_cqt(gram):
     gram = gram.T
     # and L2 normalize
     gram = librosa.util.normalize(gram, norm=2., axis=1)
-    return gram
+    # and convert to float32
+    return gram.astype(np.float32)
 
 
 def frame_times(gram):
