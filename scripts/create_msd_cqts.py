@@ -1,53 +1,17 @@
 '''
 Create feature files for MSD 7digital 30 second clips
 '''
-import numpy as np
-import librosa
-import scipy.interpolate
-import glob
+import deepdish
 import joblib
+import librosa
 import os
+import sys
+sys.path.append('..')
+import feature_extraction
+import whoosh_search
+import traceback
 
 BASE_DATA_PATH = '../data'
-mp3_glob = os.path.join(BASE_DATA_PATH, 'msd', 'mp3', '*', '*', '*', '*.mp3')
-
-
-def extract_features(audio_data):
-    '''
-    Feature extraction routine - gets beat-synchronous CQT, beats, and bpm
-
-    :parameters:
-        - audio_data : np.ndarray
-            Audio samples at 22 kHz
-
-    :returns:
-        - cqt : np.ndarray
-            Beat-synchronous CQT, four octaves, starting from note 36
-        - beats : np.ndarray
-            Beat locations, in seconds.  Beat tracking is done using CQT
-        - bpm : float
-            BPM.  If the estimated BPM is less than 160, it is doubled.
-    '''
-    gram = np.abs(librosa.cqt(
-        audio_data, fmin=librosa.midi_to_hz(36), n_bins=48))
-    # Compute onset envelope from CQT (for speed)
-    onset_envelope = librosa.onset.onset_strength(S=gram, aggregate=np.median)
-    bpm, beats = librosa.beat.beat_track(onset_envelope=onset_envelope)
-    # Double the BPM and interpolate beat locations if BPM < 160
-    while bpm < 240:
-        beat_interp = scipy.interpolate.interp1d(
-            np.arange(0, 2*beats.shape[0], 2), beats)
-        beats = beat_interp(np.arange(2*beats.shape[0] - 1)).astype(int)
-        bpm *= 2
-    # Synchronize the CQT to the beats
-    sync_gram = librosa.feature.sync(gram, beats)
-    # Also compute log amplitude
-    sync_gram = librosa.logamplitude(sync_gram, ref_power=sync_gram.max())
-    # Transpose so that rows are samples
-    sync_gram = sync_gram.T
-    # and L2 normalize
-    sync_gram = librosa.util.normalize(sync_gram, norm=2., axis=1)
-    return sync_gram, librosa.frames_to_time(beats), bpm
 
 
 def process_one_file(mp3_filename, skip=True):
@@ -58,29 +22,36 @@ def process_one_file(mp3_filename, skip=True):
         - mp3_filename : str
             Path to an mp3 file
         - skip : bool
-            Whether to skip files when the npz already exists
+            Whether to skip files when the h5 already exists
     '''
-    # npz files go in the 'npz' dir instead of 'mp3'
-    output_filename = mp3_filename.replace('mp3', 'npz')
+    # h5 files go in the 'h5' dir instead of 'mp3'
+    output_filename = mp3_filename.replace('mp3', 'h5')
     # Skip files already created
     if skip and os.path.exists(output_filename):
         return
     try:
-        audio_data, _ = librosa.load(mp3_filename)
-        cqt, beats, bpm = extract_features(audio_data)
+        # Load audio and compute CQT
+        audio_data, _ = librosa.load(
+            mp3_filename, sr=feature_extraction.AUDIO_FS)
+        cqt = feature_extraction.audio_cqt(audio_data)
+        # Create subdirectories if they don't exist
+        if not os.path.exists(os.path.split(output_filename)[0]):
+            os.makedirs(os.path.split(output_filename)[0])
+        # Save CQT
+        deepdish.io.save(output_filename, {'gram': cqt})
     except Exception as e:
-        print "Error processing {}: {}".format(mp3_filename, e)
-        return
-    # Save as float32 to save space
-    np.savez(output_filename, sync_gram=cqt.astype(np.float32),
-             beats=beats.astype(np.float32), bpm=bpm)
+        print "Error processing {}: {}".format(
+            mp3_filename, traceback.format_exc(e))
 
-# Create all output paths first to avoid joblib issues
-for mp3_filename in glob.glob(mp3_glob):
-    output_directory = os.path.split(mp3_filename.replace('mp3', 'npz'))[0]
-    if not os.path.exists(output_directory):
-        os.makedirs(output_directory)
-
-joblib.Parallel(n_jobs=11, verbose=51)(
-    joblib.delayed(process_one_file)(mp3_filename)
-    for mp3_filename in glob.glob(mp3_glob))
+if __name__ == '__main__':
+    # Load in all msd entries from whoosh index
+    index = whoosh_search.get_whoosh_index(
+        os.path.join(BASE_DATA_PATH, 'msd', 'index'))
+    with index.searcher() as searcher:
+        msd_list = list(searcher.documents())
+    # Create list of mp3 file paths
+    mp3_files = [os.path.join(BASE_DATA_PATH, 'msd', 'mp3', e['path'] + '.mp3')
+                 for e in msd_list]
+    joblib.Parallel(n_jobs=10, verbose=51)(
+        joblib.delayed(process_one_file)(mp3_filename)
+        for mp3_filename in mp3_files)
