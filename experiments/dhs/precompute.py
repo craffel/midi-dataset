@@ -7,12 +7,12 @@ import msgpack_numpy
 msgpack_numpy.patch()
 import deepdish
 import lasagne
-import utils
 import glob
 import os
 import sys
-sys.path.append('../..')
+sys.path.append(os.path.join('..', '..'))
 import feature_extraction
+import experiment_utils
 import theano
 import numpy as np
 import dhs
@@ -51,9 +51,9 @@ if __name__ == '__main__':
             file_list = [e for e in file_list if e['id'] in md5s]
         # Construct the network according to best-trial hyperparameters
         if hyperparameters['network'] == 'big_filter':
-            build_network = utils.build_network_big_filter
+            build_network = experiment_utils.build_network_big_filter
         elif hyperparameters['network'] == 'small_filters':
-            build_network = utils.build_network_small_filters
+            build_network = experiment_utils.build_network_small_filters
         layers = build_network(
             (None, 1, None, feature_extraction.N_NOTES),
             # We will supply placeholders here but load in the values below

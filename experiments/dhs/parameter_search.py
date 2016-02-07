@@ -12,7 +12,8 @@ import collections
 import lasagne
 import functools
 import sys
-import utils
+sys.path.append(os.path.join('..', '..'))
+import experiment_utils
 
 RESULTS_PATH = '../../results'
 
@@ -39,9 +40,9 @@ def run_trial(params):
             np.concatenate(data['train'][network], axis=1), axis=1)
         # Choose network structure based on network param
         if params['network'] == 'big_filter':
-            build_network = utils.build_network_big_filter
+            build_network = experiment_utils.build_network_big_filter
         elif params['network'] == 'small_filters':
-            build_network = utils.build_network_small_filters
+            build_network = experiment_utils.build_network_small_filters
         else:
             raise ValueError('Unknown network {}'.format(params['network']))
         layers[network] = build_network(

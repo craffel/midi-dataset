@@ -4,13 +4,14 @@ Match entries in the clean MIDI subset to the Million Song Dataset
 import msgpack
 import msgpack_numpy
 msgpack_numpy.patch()
+import os
 import sys
-sys.path.append('../../')
+sys.path.append(os.path.join('..', '..'))
 import whoosh_search
+import experiment_utils
 import dhs
 import os
 import joblib
-import utils
 import deepdish
 
 RESULTS_PATH = '../../results'
@@ -95,7 +96,7 @@ if __name__ == '__main__':
     msd_data_ids = [d['id'] for d in msd_data]
 
     # Get a list of valid MIDI-MSD match pairs
-    midi_msd_mapping = utils.get_valid_matches(
+    midi_msd_mapping = experiment_utils.get_valid_matches(
         os.path.join(RESULTS_PATH, '{}_pairs.csv'.format(SPLIT)),
         SCORE_THRESHOLD,
         os.path.join(RESULTS_PATH, 'clean_midi_aligned', 'h5'))
