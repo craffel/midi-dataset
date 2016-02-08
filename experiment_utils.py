@@ -5,8 +5,116 @@ import numpy as np
 import os
 import collections
 import deepdish
+import traceback
+import functools
+import glob
+import sys
 
 N_BITS = 32
+
+
+def run_trial(params, data_directory, train_function):
+    '''
+    Train a network given the task and hyperparameters and return the result.
+
+    Parameters
+    ----------
+    params : dict
+        Dictionary of model hyperparameters
+    data_directory : str
+        Path to training/validation set directory.  Should have two
+        subdirectories, one call 'train' and one called 'valid', each of which
+        contain subdirectories called 'h5', which contain training files
+        created by `deepdish`.
+    train_function : callable
+        This function will be called with the constructed network, training
+        data, and hyperparameters to create a model.
+
+    Returns
+    -------
+    best_objective : float
+        Lowest objective value achieved.
+    best_epoch : dict
+        Statistics about the epoch during which the lowest objective value was
+        achieved.
+    best_params : dict
+        Parameters of the model for the best-objective epoch.
+    '''
+    # Load in data as dictionary of dictionaries
+    data = {'train': collections.defaultdict(list),
+            'valid': collections.defaultdict(list)}
+    for set in ['train', 'valid']:
+        for f in glob.glob(os.path.join(data_directory, set, 'h5', '*.h5')):
+            for k, v in deepdish.io.load(f).items():
+                data[set][k].append(v)
+
+    # Build networks
+    layers = {}
+    for network in ['X', 'Y']:
+        # Get # of features (last dimension) from first training sequence
+        input_shape = (None, 1, None, data['train'][network][0].shape[-1])
+        # Get training set statistics for standardization
+        input_mean = np.mean(
+            np.concatenate(data['train'][network], axis=1), axis=1)
+        input_std = np.std(
+            np.concatenate(data['train'][network], axis=1), axis=1)
+        # Choose network structure based on network param
+        if params['network'] == 'big_filter':
+            build_network = build_network_big_filter
+        elif params['network'] == 'small_filters':
+            build_network = build_network_small_filters
+        else:
+            raise ValueError('Unknown network {}'.format(params['network']))
+        layers[network] = build_network(
+            input_shape, input_mean, input_std,
+            params['downsample_frequency'], params['dropout'])
+
+    # Create updates-creating function
+    updates_function = functools.partial(
+        lasagne.updates.rmsprop, learning_rate=params['learning_rate'],
+        rho=params['momentum'])
+
+    print ',\n'.join(['\t{} : {}'.format(k, v) for k, v in params.items()])
+    # Create a list of epochs
+    epochs = []
+    # Keep track of lowest objective found so far
+    best_objective = np.inf
+    try:
+        for epoch in train_function(
+                data['train']['X'], data['train']['Y'], data['valid']['X'],
+                data['valid']['Y'], layers, params['negative_importance'],
+                params['negative_threshold'], params['entropy_importance'],
+                updates_function):
+            # Stop training if a nan training cost is encountered
+            if not np.isfinite(epoch['train_cost']):
+                break
+            epochs.append(epoch)
+            if epoch['validate_objective'] < best_objective:
+                best_objective = epoch['validate_objective']
+                best_epoch = epoch
+                best_model = {
+                    'X': lasagne.layers.get_all_param_values(layers['X']),
+                    'Y': lasagne.layers.get_all_param_values(layers['Y'])}
+            print "{}: {}, ".format(epoch['iteration'],
+                                    epoch['validate_objective']),
+            sys.stdout.flush()
+    # If there was an error while training, report it to whetlab
+    except Exception:
+        print "ERROR: "
+        print traceback.format_exc()
+        return np.nan, {}, {}
+    print
+    # Check that all training costs were not NaN; return NaN if any were.
+    success = np.all([np.isfinite(e['train_cost']) for e in epochs])
+    if np.isinf(best_objective) or len(epochs) == 0 or not success:
+        print '    Failed to converge.'
+        print
+        return np.nan, {}, {}
+    else:
+        for k, v in best_epoch.items():
+            print "\t{:>35} | {}".format(k, v)
+        print
+        return best_objective, best_epoch, best_model
 
 
 def build_network_small_filters(input_shape, input_mean, input_std,
