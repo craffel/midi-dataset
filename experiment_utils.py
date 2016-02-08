@@ -42,23 +42,23 @@ def run_trial(params, data_directory, train_function):
         Parameters of the model for the best-objective epoch.
     '''
     # Load in data as dictionary of dictionaries
-    data = {'train': collections.defaultdict(list),
-            'validate': collections.defaultdict(list)}
+    data = {'X': collections.defaultdict(list),
+            'Y': collections.defaultdict(list)}
     for set in ['train', 'validate']:
         for f in glob.glob(os.path.join(data_directory, set, 'h5', '*.h5')):
             for k, v in deepdish.io.load(f).items():
-                data[set][k].append(v)
+                data[k][set].append(v)
 
     # Build networks
     layers = {}
     for network in ['X', 'Y']:
         # Get # of features (last dimension) from first training sequence
-        input_shape = (None, 1, None, data['train'][network][0].shape[-1])
+        input_shape = (None, 1, None, data[network]['train'][0].shape[-1])
         # Get training set statistics for standardization
         input_mean = np.mean(
-            np.concatenate(data['train'][network], axis=1), axis=1)
+            np.concatenate(data[network]['train'], axis=1), axis=1)
         input_std = np.std(
-            np.concatenate(data['train'][network], axis=1), axis=1)
+            np.concatenate(data[network]['train'], axis=1), axis=1)
         # Choose network structure based on network param
         if params['network'] == 'big_filter':
             build_network = build_network_big_filter
@@ -82,8 +82,7 @@ def run_trial(params, data_directory, train_function):
     best_objective = np.inf
     try:
         for epoch in train_function(
-                data['train']['X'], data['train']['Y'], data['validate']['X'],
-                data['validate']['Y'], layers, params['negative_importance'],
+                data, layers, params['negative_importance'],
                 params['negative_threshold'], params['entropy_importance'],
                 updates_function):
             # Stop training if a nan training cost is encountered
