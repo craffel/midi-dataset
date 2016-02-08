@@ -9,6 +9,7 @@ import traceback
 import functools
 import glob
 import sys
+import simple_spearmint
 
 N_BITS = 32
 
@@ -115,6 +116,68 @@ def run_trial(params, data_directory, train_function):
             print "\t{:>35} | {}".format(k, v)
         print
         return best_objective, best_epoch, best_model
+
+
+def parameter_search(space, trial_directory, model_directory, data_directory,
+                     train_function):
+    '''
+    Run parameter optimization given some train function, writing out results
+
+    Parameters
+    ----------
+    space : dict
+        Hyperparameter space (in the format used by `simple_spearmint`) to
+        optimize over
+    trial_directory : str
+        Directory where parameter optimization trial results will be written
+    model_directory : str
+        Directory where the best-performing model will be written
+    data_directory : str
+        Path to training/validation set directory.  Should have two
+        subdirectories, one call 'train' and one called 'valid', each of which
+        contain subdirectories called 'h5', which contain training files
+        created by `deepdish`.
+    train_function : callable
+        This function will be called with the constructed network, training
+        data, and hyperparameters to create a model.
+    '''
+    # Create parameter trials directory if it doesn't exist
+    if not os.path.exists(trial_directory):
+        os.makedirs(trial_directory)
+    # Same for model directory
+    if not os.path.exists(model_directory):
+        os.makedirs(model_directory)
+
+    # Create SimpleSpearmint suggester instance
+    ss = simple_spearmint.SimpleSpearmint(space)
+
+    # Load in previous results for "warm start"
+    for trial_file in glob.glob(os.path.join(trial_directory, '*.h5')):
+        trial = deepdish.io.load(trial_file)
+        ss.update(trial['hyperparameters'], trial['best_objective'])
+
+    # Run parameter optimization forever
+    while True:
+        # Get a new suggestion
+        suggestion = ss.suggest()
+        # Train a network with these hyperparameters
+        best_objective, best_epoch, best_model = run_trial(
+            suggestion, data_directory, train_function)
+        # Update spearmint on the result
+        ss.update(suggestion, best_objective)
+        # Write out a result file
+        trial_filename = ','.join('{}={}'.format(k, v)
+                                  for k, v in suggestion.items()) + '.h5'
+        deepdish.io.save(
+            os.path.join(trial_directory, trial_filename),
+            {'hyperparameters': suggestion, 'best_objective': best_objective,
+             'best_epoch': best_epoch})
+        # Also write out the entire model when the objective is the smallest
+        # We don't want to write all models; they are > 100MB each
+        if (not np.isnan(best_objective) and
+                best_objective == np.min(ss.objective_values)):
+            deepdish.io.save(
+                os.path.join(model_directory, 'best_model.h5'), best_model)
 
 
 def build_network_small_filters(input_shape, input_mean, input_std,
