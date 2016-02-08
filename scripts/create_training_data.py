@@ -82,7 +82,7 @@ if __name__ == '__main__':
 
     aligned_path = os.path.join(RESULTS_PATH, 'clean_midi_aligned', 'h5')
 
-    for dataset in ['train', 'valid']:
+    for dataset in ['train', 'validate']:
         # Create output path for this dataset split
         output_path = os.path.join(
             RESULTS_PATH, 'training_dataset', dataset, 'h5')

@@ -24,8 +24,8 @@ def run_trial(params, data_directory, train_function):
         Dictionary of model hyperparameters
     data_directory : str
         Path to training/validation set directory.  Should have two
-        subdirectories, one call 'train' and one called 'valid', each of which
-        contain subdirectories called 'h5', which contain training files
+        subdirectories, one called 'train' and one called 'validate', each of
+        which contain subdirectories called 'h5', which contain training files
         created by `deepdish`.
     train_function : callable
         This function will be called with the constructed network, training
@@ -43,8 +43,8 @@ def run_trial(params, data_directory, train_function):
     '''
     # Load in data as dictionary of dictionaries
     data = {'train': collections.defaultdict(list),
-            'valid': collections.defaultdict(list)}
-    for set in ['train', 'valid']:
+            'validate': collections.defaultdict(list)}
+    for set in ['train', 'validate']:
         for f in glob.glob(os.path.join(data_directory, set, 'h5', '*.h5')):
             for k, v in deepdish.io.load(f).items():
                 data[set][k].append(v)
@@ -82,8 +82,8 @@ def run_trial(params, data_directory, train_function):
     best_objective = np.inf
     try:
         for epoch in train_function(
-                data['train']['X'], data['train']['Y'], data['valid']['X'],
-                data['valid']['Y'], layers, params['negative_importance'],
+                data['train']['X'], data['train']['Y'], data['validate']['X'],
+                data['validate']['Y'], layers, params['negative_importance'],
                 params['negative_threshold'], params['entropy_importance'],
                 updates_function):
             # Stop training if a nan training cost is encountered
@@ -134,8 +134,8 @@ def parameter_search(space, trial_directory, model_directory, data_directory,
         Directory where the best-performing model will be written
     data_directory : str
         Path to training/validation set directory.  Should have two
-        subdirectories, one call 'train' and one called 'valid', each of which
-        contain subdirectories called 'h5', which contain training files
+        subdirectories, one called 'train' and one called 'validate', each of
+        which contain subdirectories called 'h5', which contain training files
         created by `deepdish`.
     train_function : callable
         This function will be called with the constructed network, training

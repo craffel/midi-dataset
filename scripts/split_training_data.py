@@ -24,7 +24,7 @@ with open(os.path.join(RESULTS_PATH, 'text_matches.js')) as f:
 
 # List of output files to write
 output_files = [
-    'train_pairs.csv', 'valid_pairs.csv', 'dev_pairs.csv', 'test_pairs.csv']
+    'train_pairs.csv', 'validate_pairs.csv', 'dev_pairs.csv', 'test_pairs.csv']
 # Lists of training, validation, and test set files to be populated below
 file_sets = [[] for _ in range(len(output_files))]
 
