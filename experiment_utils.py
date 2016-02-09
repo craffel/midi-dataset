@@ -60,9 +60,9 @@ def run_trial(params, data_directory, train_function):
         input_std = np.std(
             np.concatenate(data[network]['train'], axis=1), axis=1)
         # Choose network structure based on network param
-        if params['network'] == 'big_filter':
+        if params['network'] == 'dhs_big_filter':
             build_network = build_dhs_net_big_filter
-        elif params['network'] == 'small_filters':
+        elif params['network'] == 'dhs_small_filters':
             build_network = build_dhs_net_small_filters
         else:
             raise ValueError('Unknown network {}'.format(params['network']))
@@ -244,8 +244,9 @@ def build_dhs_net_small_filters(input_shape, input_mean, input_std,
                                 downsample_frequency, dropout, n_conv=3,
                                 n_bits=N_BITS):
     '''
-    Construct a list of layers of a network which has three groups of two 3x3
-    convolutional layers followed by a max-pooling layer.
+    Construct a list of layers of a network for mapping sequences of feature
+    vectors to downsampled sequences of binary vectors which has three groups
+    of two 3x3 convolutional layers followed by a max-pooling layer.
 
     Parameters
     ----------
@@ -322,8 +323,9 @@ def build_dhs_net_big_filter(input_shape, input_mean, input_std,
                              downsample_frequency, dropout, n_conv=3,
                              n_bits=N_BITS):
     '''
-    Construct a list of layers of a network which has a ``big'' 5x12 input
-    filter and two 3x3 convolutional layers, all followed by max-pooling
+    Construct a list of layers of a network for mapping sequences of feature
+    vectors to downsampled sequences of binary vectors which has a ``big'' 5x12
+    input filter and two 3x3 convolutional layers, all followed by max-pooling
     layers.
 
     Parameters

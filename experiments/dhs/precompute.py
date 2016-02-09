@@ -50,9 +50,9 @@ if __name__ == '__main__':
                     if line.split(',')[1] == 'msd']
             file_list = [e for e in file_list if e['id'] in md5s]
         # Construct the network according to best-trial hyperparameters
-        if hyperparameters['network'] == 'big_filter':
+        if hyperparameters['network'] == 'dhs_big_filter':
             build_network = experiment_utils.build_dhs_net_big_filter
-        elif hyperparameters['network'] == 'small_filters':
+        elif hyperparameters['network'] == 'dhs_small_filters':
             build_network = experiment_utils.build_dhs_net_small_filters
         layers = build_network(
             (None, 1, None, feature_extraction.N_NOTES),

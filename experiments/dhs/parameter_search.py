@@ -20,7 +20,8 @@ if __name__ == '__main__':
         'negative_importance': {'type': 'float', 'min': 0.01, 'max': 1.},
         'entropy_importance': {'type': 'float', 'min': 0.0, 'max': 1.},
         'downsample_frequency': {'type': 'int', 'min': 0, 'max': 1},
-        'network': {'type': 'enum', 'options': ['big_filter', 'small_filters']}
+        'network': {'type': 'enum',
+                    'options': ['dhs_big_filter', 'dhs_small_filters']}
     }
 
     # Construct paths
