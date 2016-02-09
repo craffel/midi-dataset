@@ -61,9 +61,9 @@ def run_trial(params, data_directory, train_function):
             np.concatenate(data[network]['train'], axis=1), axis=1)
         # Choose network structure based on network param
         if params['network'] == 'big_filter':
-            build_network = build_network_big_filter
+            build_network = build_dhs_net_big_filter
         elif params['network'] == 'small_filters':
-            build_network = build_network_small_filters
+            build_network = build_dhs_net_small_filters
         else:
             raise ValueError('Unknown network {}'.format(params['network']))
         layers[network] = build_network(
@@ -240,7 +240,7 @@ def _build_hash_sequence_dense(layers, dropout, n_bits):
     return layers
 
 
-def build_network_small_filters(input_shape, input_mean, input_std,
+def build_dhs_net_small_filters(input_shape, input_mean, input_std,
                                 downsample_frequency, dropout, n_conv=3,
                                 n_bits=N_BITS):
     '''
@@ -318,7 +318,7 @@ def _build_big_filter_frontend(layers, downsample_frequency, n_conv):
     return layers
 
 
-def build_network_big_filter(input_shape, input_mean, input_std,
+def build_dhs_net_big_filter(input_shape, input_mean, input_std,
                              downsample_frequency, dropout, n_conv=3,
                              n_bits=N_BITS):
     '''
