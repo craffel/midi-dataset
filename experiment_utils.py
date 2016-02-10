@@ -382,9 +382,9 @@ def _build_ff_attention_dense(layers, dropout, output_dim):
     # We must also construct the bias scalar shared variable ourseves because
     # deepdish won't save numpy scalars
     layers.append(pse.AttentionLayer(
-        layers[-1],
-        W=lasagne.init.Normal(1./np.sqrt(layers[-1].output_shape[-1])),
-        b=theano.shared(np.array([0.], theano.config.floatX),
+        layers[-1], N_HIDDEN,
+        v=lasagne.init.Normal(1./np.sqrt(layers[-1].output_shape[-1])),
+        c=theano.shared(np.array([0.], theano.config.floatX),
                         broadcastable=(True,))))
     # Add dense hidden layers and optionally dropout
     for hidden_layer_size in [N_HIDDEN, N_HIDDEN]:
