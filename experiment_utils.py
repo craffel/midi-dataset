@@ -10,8 +10,10 @@ import functools
 import glob
 import sys
 import simple_spearmint
+import pse
 
 N_BITS = 32
+OUTPUT_DIM = 128
 
 
 def run_trial(params, data_directory, train_function):
@@ -64,6 +66,10 @@ def run_trial(params, data_directory, train_function):
             build_network = build_dhs_net_big_filter
         elif params['network'] == 'dhs_small_filters':
             build_network = build_dhs_net_small_filters
+        elif params['network'] == 'pse_big_filter':
+            build_network = build_pse_net_big_filter
+        elif params['network'] == 'pse_small_filters':
+            build_network = build_pse_net_small_filters
         else:
             raise ValueError('Unknown network {}'.format(params['network']))
         layers[network] = build_network(
@@ -355,6 +361,108 @@ def build_dhs_net_big_filter(input_shape, input_mean, input_std,
     layers = _build_big_filter_frontend(
         layers, downsample_frequency, n_conv)
     layers = _build_hash_sequence_dense(layers, dropout, n_bits)
+    return layers
+
+
+def _build_ff_attention_dense(layers, dropout, output_dim):
+    # Combine the "n_channels" dimension with the "n_features"
+    # dimension
+    layers.append(lasagne.layers.DimshuffleLayer(layers[-1], (0, 2, 1, 3)))
+    layers.append(lasagne.layers.ReshapeLayer(layers[-1], ([0], [1], -1)))
+    # Add the attention layer to aggregate over time steps
+    # We must force He initialization because Lasagne doesn't like 1-dim
+    # shapes in He and Glorot initializers
+    layers.append(pse.AttentionLayer(
+        layers[-1],
+        W=lasagne.init.Normal(1./np.sqrt(layers[-1].output_shape[-1]))))
+    # Add dense hidden layers and optionally dropout
+    for hidden_layer_size in [2048, 2048]:
+        layers.append(lasagne.layers.DenseLayer(
+            layers[-1], num_units=hidden_layer_size,
+            nonlinearity=lasagne.nonlinearities.rectify))
+        if dropout:
+            layers.append(lasagne.layers.DropoutLayer(layers[-1], .5))
+    # Add output layer
+    layers.append(lasagne.layers.DenseLayer(
+        layers[-1], num_units=output_dim,
+        nonlinearity=lasagne.nonlinearities.tanh))
+    return layers
+
+
+def build_pse_net_big_filter(input_shape, input_mean, input_std,
+                             downsample_frequency, dropout, n_conv=3,
+                             output_dim=OUTPUT_DIM):
+    '''
+    Construct a list of layers of a network which embeds sequences in a
+    fixed-dimensional output space using feedforward attention, which has a
+    ``big'' 5x12 input filter and two 3x3 convolutional layers, all followed by
+    max-pooling layers.
+
+    Parameters
+    ----------
+    input_shape : tuple
+        In what shape will data be supplied to the network?
+    input_mean : np.ndarray
+        Training set mean, to standardize inputs with.
+    input_std : np.ndarray
+        Training set standard deviation, to standardize inputs with.
+    downsample_frequency : bool
+        Whether to max-pool over frequency
+    dropout : bool
+        Should dropout be applied between fully-connected layers?
+    n_conv : int
+        Number of convolutional/pooling layer groups
+    output_dim : int
+        Output dimensionality
+
+    Returns
+    -------
+    layers : list
+        List of layer instances for this network.
+    '''
+    # Use utility functions to construct input, frontend, and dense output
+    layers = _build_input(input_shape, input_mean, input_std)
+    layers = _build_big_filter_frontend(
+        layers, downsample_frequency, n_conv)
+    layers = _build_ff_attention_dense(layers, dropout, output_dim)
+    return layers
+
+
+def build_pse_net_small_filters(input_shape, input_mean, input_std,
+                                downsample_frequency, dropout, n_conv=3,
+                                output_dim=OUTPUT_DIM):
+    '''
+    Construct a list of layers of a network which embeds sequences in a
+    fixed-dimensional output space using feedforward attention, which has
+    groups of two 3x3 convolutional layers and max-pooling layers.
+
+    Parameters
+    ----------
+    input_shape : tuple
+        In what shape will data be supplied to the network?
+    input_mean : np.ndarray
+        Training set mean, to standardize inputs with.
+    input_std : np.ndarray
+        Training set standard deviation, to standardize inputs with.
+    downsample_frequency : bool
+        Whether to max-pool over frequency
+    dropout : bool
+        Should dropout be applied between fully-connected layers?
+    n_conv : int
+        Number of convolutional/pooling layer groups
+    output_dim : int
+        Output dimensionality
+
+    Returns
+    -------
+    layers : list
+        List of layer instances for this network.
+    '''
+    # Use utility functions to construct input, frontend, and dense output
+    layers = _build_input(input_shape, input_mean, input_std)
+    layers = _build_small_filters_frontend(
+        layers, downsample_frequency, n_conv)
+    layers = _build_ff_attention_dense(layers, dropout, output_dim)
     return layers
 
 
