@@ -43,6 +43,11 @@ def run_trial(params, data_directory, train_function):
     best_params : dict
         Parameters of the model for the best-objective epoch.
     '''
+    # We will be modifying params, so make a copy of it
+    params = dict(params)
+    # Fill in default parameter values which may not be used by all experiments
+    params['n_conv'] = params.get('n_conv', 3)
+    params['downsample_frequency'] = params.get('downsample_frequency', True)
     # Load in data as dictionary of dictionaries
     data = {'X': collections.defaultdict(list),
             'Y': collections.defaultdict(list)}
@@ -73,8 +78,8 @@ def run_trial(params, data_directory, train_function):
         else:
             raise ValueError('Unknown network {}'.format(params['network']))
         layers[network] = build_network(
-            input_shape, input_mean, input_std,
-            params['downsample_frequency'], params['dropout'])
+            input_shape, input_mean, input_std, params['downsample_frequency'],
+            params['dropout'], params['n_conv'])
 
     # Create updates-creating function
     updates_function = functools.partial(
