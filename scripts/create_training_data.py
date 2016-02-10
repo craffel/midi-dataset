@@ -19,7 +19,8 @@ SCORE_THRESHOLD = .5
 RESULTS_PATH = '../results'
 
 
-def process_one_file(diagnostics_file, output_filename):
+def process_one_file(diagnostics_file, output_filename,
+                     output_filename_unaligned):
     # If the alignment failed and there was no diagnostics file, return
     if not os.path.exists(diagnostics_file):
         return
@@ -30,28 +31,39 @@ def process_one_file(diagnostics_file, output_filename):
         return
     try:
         # Load in MIDI data
-        pm = pretty_midi.PrettyMIDI(str(diagnostics['output_midi_filename']))
+        pm_unaligned = pretty_midi.PrettyMIDI(
+            str(diagnostics['midi_filename']))
         # Synthesize MIDI data and extract CQT
-        midi_gram = feature_extraction.midi_cqt(pm)
-        midi_frame_times = feature_extraction.frame_times(midi_gram)
+        midi_gram_unaligned = feature_extraction.midi_cqt(pm_unaligned)
         # Get audio CQT
         audio_features = deepdish.io.load(
             str(diagnostics['audio_features_filename']))
         audio_gram = audio_features['gram']
         audio_frame_times = feature_extraction.frame_times(audio_gram)
+        # Write out unaligned MIDI CQT
+        deepdish.io.save(output_filename_unaligned,
+                         {'X': midi_gram_unaligned[np.newaxis],
+                          'Y': audio_gram[np.newaxis]})
+        # Load in MIDI data
+        pm_aligned = pretty_midi.PrettyMIDI(
+            str(diagnostics['output_midi_filename']))
+        # Synthesize MIDI data and extract CQT
+        midi_gram_aligned = feature_extraction.midi_cqt(pm_aligned)
+        midi_frame_times = feature_extraction.frame_times(midi_gram_aligned)
         # Get indices which fall within the range of correct alignment
-        start_time = min([n.start for i in pm.instruments for n in i.notes])
-        end_time = min(pm.get_end_time(), midi_frame_times.max(),
+        start_time = min(
+            n.start for i in pm_aligned.instruments for n in i.notes)
+        end_time = min(pm_aligned.get_end_time(), midi_frame_times.max(),
                        audio_frame_times.max())
         if end_time <= start_time:
             return
         # Mask out the times within the aligned region
         audio_gram = audio_gram[np.logical_and(audio_frame_times >= start_time,
                                                audio_frame_times <= end_time)]
-        midi_gram = midi_gram[np.logical_and(midi_frame_times >= start_time,
-                                             midi_frame_times <= end_time)]
+        midi_gram = midi_gram_aligned[
+            np.logical_and(midi_frame_times >= start_time,
+                           midi_frame_times <= end_time)]
         # Write out matrices with a newaxis at front (for # of channels)
-        # Also downcast to float32, to save space and for GPU-ability
         deepdish.io.save(
             output_filename, {'X': midi_gram[np.newaxis],
                               'Y': audio_gram[np.newaxis]})
@@ -83,11 +95,15 @@ if __name__ == '__main__':
     aligned_path = os.path.join(RESULTS_PATH, 'clean_midi_aligned', 'h5')
 
     for dataset in ['train', 'validate']:
-        # Create output path for this dataset split
+        # Create output paths for this dataset split
         output_path = os.path.join(
             RESULTS_PATH, 'training_dataset', dataset, 'h5')
         if not os.path.exists(output_path):
             os.makedirs(output_path)
+        output_path_unaligned = os.path.join(
+            RESULTS_PATH, 'training_dataset_unaligned', dataset, 'h5')
+        if not os.path.exists(output_path_unaligned):
+            os.makedirs(output_path_unaligned)
         # Load in all pairs for this split
         pair_file = os.path.join(
             RESULTS_PATH, '{}_pairs.csv'.format(dataset))
@@ -98,5 +114,7 @@ if __name__ == '__main__':
         joblib.Parallel(n_jobs=10, verbose=51)(
             joblib.delayed(process_one_file)(
                 os.path.join(aligned_path, '{}_{}_{}.h5'.format(*pair)),
-                os.path.join(output_path, '{}_{}_{}.h5'.format(*pair)))
+                os.path.join(output_path, '{}_{}_{}.h5'.format(*pair)),
+                os.path.join(output_path_unaligned,
+                             '{}_{}_{}.h5'.format(*pair)))
             for pair in pairs)
