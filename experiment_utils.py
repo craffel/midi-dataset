@@ -14,6 +14,7 @@ import pse
 
 N_BITS = 32
 OUTPUT_DIM = 128
+N_HIDDEN = 2048
 
 
 def run_trial(params, data_directory, train_function):
@@ -238,7 +239,7 @@ def _build_hash_sequence_dense(layers, dropout, n_bits):
     layers.append(lasagne.layers.ReshapeLayer(
         layers[-1], (-1, conv_output_shape[2]*conv_output_shape[3])))
     # Add dense hidden layers and optionally dropout
-    for hidden_layer_size in [2048, 2048]:
+    for hidden_layer_size in [N_HIDDEN, N_HIDDEN]:
         layers.append(lasagne.layers.DenseLayer(
             layers[-1], num_units=hidden_layer_size,
             nonlinearity=lasagne.nonlinearities.rectify))
@@ -381,7 +382,7 @@ def _build_ff_attention_dense(layers, dropout, output_dim):
         layers[-1],
         W=lasagne.init.Normal(1./np.sqrt(layers[-1].output_shape[-1]))))
     # Add dense hidden layers and optionally dropout
-    for hidden_layer_size in [2048, 2048]:
+    for hidden_layer_size in [N_HIDDEN, N_HIDDEN]:
         layers.append(lasagne.layers.DenseLayer(
             layers[-1], num_units=hidden_layer_size,
             nonlinearity=lasagne.nonlinearities.rectify))
