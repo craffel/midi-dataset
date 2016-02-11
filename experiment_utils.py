@@ -75,14 +75,19 @@ def run_trial(params, data_directory, train_function):
         elif params['network'] == 'dhs_small_filters':
             build_network = build_dhs_net_small_filters
         elif params['network'] == 'pse_big_filter':
-            build_network = build_pse_net_big_filter
+            # PSE networks have an additional n_attention parameter which must
+            # be factored out here
+            build_network = functools.partial(
+                build_pse_net_big_filter, n_attention=params['n_attention'])
         elif params['network'] == 'pse_small_filters':
-            build_network = build_pse_net_small_filters
+            build_network = functools.partial(
+                build_pse_net_small_filters, n_attention=params['n_attention'])
         else:
             raise ValueError('Unknown network {}'.format(params['network']))
         layers[network] = build_network(
-            input_shape, input_mean, input_std, params['downsample_frequency'],
-            params['dropout'], params['n_conv'])
+            input_shape, input_mean, input_std,
+            downsample_frequency=params['downsample_frequency'],
+            dropout=params['dropout'], n_conv=params['n_conv'])
 
     # Create updates-creating function
     updates_function = functools.partial(
@@ -371,21 +376,27 @@ def build_dhs_net_big_filter(input_shape, input_mean, input_std,
     return layers
 
 
-def _build_ff_attention_dense(layers, dropout, output_dim):
+def _build_ff_attention_dense(layers, n_attention, dropout, output_dim):
     # Combine the "n_channels" dimension with the "n_features"
     # dimension
     layers.append(lasagne.layers.DimshuffleLayer(layers[-1], (0, 2, 1, 3)))
     layers.append(lasagne.layers.ReshapeLayer(layers[-1], ([0], [1], -1)))
-    # Add the attention layer to aggregate over time steps
-    # We must force He initialization because Lasagne doesn't like 1-dim
-    # shapes in He and Glorot initializers
-    # We must also construct the bias scalar shared variable ourseves because
-    # deepdish won't save numpy scalars
-    layers.append(pse.AttentionLayer(
+    # Function which constructs attention layers
+    attention_layer_factory = lambda: pse.AttentionLayer(
         layers[-1], N_HIDDEN,
+        # We must force He initialization because Lasagne doesn't like 1-dim
+        # shapes in He and Glorot initializers
         v=lasagne.init.Normal(1./np.sqrt(layers[-1].output_shape[-1])),
+        # We must also construct the bias scalar shared variable ourseves
+        # because deepdish won't save numpy scalars
         c=theano.shared(np.array([0.], theano.config.floatX),
-                        broadcastable=(True,))))
+                        broadcastable=(True,)))
+    # Construct list of attention layers for later concatenation
+    attention_layers = [attention_layer_factory() for _ in range(n_attention)]
+    # Add all attention layers into the list of layers
+    layers += attention_layers
+    # Concatenate all attention layers
+    layers.append(lasagne.layers.ConcatLayer(attention_layers))
     # Add dense hidden layers and optionally dropout
     for hidden_layer_size in [N_HIDDEN, N_HIDDEN]:
         layers.append(lasagne.layers.DenseLayer(
@@ -401,8 +412,8 @@ def _build_ff_attention_dense(layers, dropout, output_dim):
 
 
 def build_pse_net_big_filter(input_shape, input_mean, input_std,
-                             downsample_frequency, dropout, n_conv=3,
-                             output_dim=OUTPUT_DIM):
+                             downsample_frequency, n_attention, dropout,
+                             n_conv=3, output_dim=OUTPUT_DIM):
     '''
     Construct a list of layers of a network which embeds sequences in a
     fixed-dimensional output space using feedforward attention, which has a
@@ -419,6 +430,8 @@ def build_pse_net_big_filter(input_shape, input_mean, input_std,
         Training set standard deviation, to standardize inputs with.
     downsample_frequency : bool
         Whether to max-pool over frequency
+    n_attention : int
+        Number of attention layers
     dropout : bool
         Should dropout be applied between fully-connected layers?
     n_conv : int
@@ -435,13 +448,14 @@ def build_pse_net_big_filter(input_shape, input_mean, input_std,
     layers = _build_input(input_shape, input_mean, input_std)
     layers = _build_big_filter_frontend(
         layers, downsample_frequency, n_conv)
-    layers = _build_ff_attention_dense(layers, dropout, output_dim)
+    layers = _build_ff_attention_dense(
+        layers, n_attention, dropout, output_dim)
     return layers
 
 
 def build_pse_net_small_filters(input_shape, input_mean, input_std,
-                                downsample_frequency, dropout, n_conv=3,
-                                output_dim=OUTPUT_DIM):
+                                downsample_frequency, n_attention, dropout,
+                                n_conv=3, output_dim=OUTPUT_DIM):
     '''
     Construct a list of layers of a network which embeds sequences in a
     fixed-dimensional output space using feedforward attention, which has
@@ -457,6 +471,8 @@ def build_pse_net_small_filters(input_shape, input_mean, input_std,
         Training set standard deviation, to standardize inputs with.
     downsample_frequency : bool
         Whether to max-pool over frequency
+    n_attention : int
+        Number of attention layers
     dropout : bool
         Should dropout be applied between fully-connected layers?
     n_conv : int
@@ -473,7 +489,8 @@ def build_pse_net_small_filters(input_shape, input_mean, input_std,
     layers = _build_input(input_shape, input_mean, input_std)
     layers = _build_small_filters_frontend(
         layers, downsample_frequency, n_conv)
-    layers = _build_ff_attention_dense(layers, dropout, output_dim)
+    layers = _build_ff_attention_dense(
+        layers, n_attention, dropout, output_dim)
     return layers
 
 

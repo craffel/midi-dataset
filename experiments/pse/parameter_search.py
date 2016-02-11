@@ -19,6 +19,7 @@ if __name__ == '__main__':
         'negative_importance': {'type': 'float', 'min': 0.01, 'max': 3.},
         'entropy_importance': {'type': 'float', 'min': 0.0, 'max': 1.},
         'n_conv': {'type': 'int', 'min': 0, 'max': 3},
+        'n_attention': {'type': 'int', 'min': 1, 'max': 4},
         'network': {'type': 'enum',
                     'options': ['pse_big_filter', 'pse_small_filters']}
     }
