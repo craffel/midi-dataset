@@ -47,6 +47,7 @@ def run_trial(params, data_directory, train_function):
     '''
     # We will be modifying params, so make a copy of it
     params = dict(params)
+    print ',\n'.join(['\t{} : {}'.format(k, v) for k, v in params.items()])
     # Fill in default parameter values which may not be used by all experiments
     params['n_conv'] = params.get('n_conv', 3)
     params['downsample_frequency'] = params.get('downsample_frequency', True)
@@ -88,7 +89,6 @@ def run_trial(params, data_directory, train_function):
         lasagne.updates.rmsprop, learning_rate=params['learning_rate'],
         rho=params['momentum'])
 
-    print ',\n'.join(['\t{} : {}'.format(k, v) for k, v in params.items()])
     # Create a list of epochs
     epochs = []
     # Keep track of lowest objective found so far
