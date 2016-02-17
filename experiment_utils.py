@@ -192,7 +192,7 @@ def parameter_search(space, trial_directory, model_directory, data_directory,
         # Also write out the entire model when the objective is the smallest
         # We don't want to write all models; they are > 100MB each
         if (not np.isnan(best_objective) and
-                best_objective == np.min(ss.objective_values)):
+                best_objective == np.nanmin(ss.objective_values)):
             deepdish.io.save(
                 os.path.join(model_directory, 'best_model.h5'), best_model)
 
