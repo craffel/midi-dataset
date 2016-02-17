@@ -13,11 +13,11 @@ if __name__ == '__main__':
     # Define hyperparameter space
     space = {
         'momentum': {'type': 'float', 'min': 0., 'max': 1.},
-        'negative_threshold': {'type': 'int', 'min': 1, 'max': 16},
+        'negative_threshold': {'type': 'int', 'min': 1, 'max': 100},
         'dropout': {'type': 'int', 'min': 0, 'max': 1},
         'learning_rate': {'type': 'float', 'min': .000001, 'max': .01},
-        'negative_importance': {'type': 'float', 'min': 0.01, 'max': 3.},
-        'entropy_importance': {'type': 'float', 'min': 0.0, 'max': 1.},
+        'negative_importance': {'type': 'float', 'min': 0.01, 'max': 4.},
+        'entropy_importance': {'type': 'float', 'min': 0.0, 'max': 4.},
         'n_conv': {'type': 'int', 'min': 0, 'max': 3},
         'n_attention': {'type': 'int', 'min': 1, 'max': 4},
         'network': {'type': 'enum',
