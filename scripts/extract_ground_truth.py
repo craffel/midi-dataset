@@ -4,7 +4,6 @@ Code for extracting ground truth from aligned MIDI results.
 
 import sys
 sys.path.append('..')
-sys.path.append('/home/craffel/projects/midi-dataset/')
 import numpy as np
 import librosa
 import feature_extraction
