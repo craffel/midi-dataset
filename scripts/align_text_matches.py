@@ -182,7 +182,7 @@ def align_one_file(audio_filename, midi_filename, audio_features_filename=None,
         # Check that the distance matrix will not be too big before computing
         size = midi_features['gram'].shape[0]*audio_features['gram'].shape[0]
         # If > 1 GB, skip
-        if (size*64/8e9 > 1):
+        if (size*64/8e9 > 2):
             print (
                 "Distance matrix for {} and {} would be {} GB because the "
                 "CQTs have shape {} and {}".format(
