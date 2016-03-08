@@ -101,7 +101,7 @@ def run_trial(params, data_directory, train_function):
     try:
         for epoch in train_function(
                 data, layers, params['negative_importance'],
-                params['negative_threshold'], params['entropy_importance'],
+                params['negative_threshold'], params['output_l2_penalty'],
                 updates_function):
             # Stop training if a nan training cost is encountered
             if not np.isfinite(epoch['train_cost']):
