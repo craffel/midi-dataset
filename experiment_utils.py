@@ -87,7 +87,7 @@ def run_trial(params, data_directory, train_function):
         layers[network] = build_network(
             input_shape, input_mean, input_std,
             downsample_frequency=params['downsample_frequency'],
-            dropout=params['dropout'], n_conv=params['n_conv'])
+            n_conv=params['n_conv'])
 
     # Create updates-creating function
     updates_function = functools.partial(
@@ -233,7 +233,7 @@ def _build_small_filters_frontend(layers, downsample_frequency, n_conv):
     return layers
 
 
-def _build_hash_sequence_dense(layers, dropout, n_bits):
+def _build_hash_sequence_dense(layers, n_bits):
     # A dense layer will treat any dimensions after the first as feature
     # dimensions, but the third dimension is really a timestep dimension.
     # We can only squash adjacent dimensions with a ReshapeLayer, so we
@@ -244,13 +244,11 @@ def _build_hash_sequence_dense(layers, dropout, n_bits):
     # Reshape to (n_batch*n_time_steps, n_conv_output_features)
     layers.append(lasagne.layers.ReshapeLayer(
         layers[-1], (-1, conv_output_shape[2]*conv_output_shape[3])))
-    # Add dense hidden layers and optionally dropout
+    # Add dense hidden layers
     for hidden_layer_size in [N_HIDDEN, N_HIDDEN]:
         layers.append(lasagne.layers.DenseLayer(
             layers[-1], num_units=hidden_layer_size,
             nonlinearity=lasagne.nonlinearities.rectify))
-        if dropout:
-            layers.append(lasagne.layers.DropoutLayer(layers[-1], .5))
     # Add output layer
     layers.append(lasagne.layers.DenseLayer(
         layers[-1], num_units=n_bits,
@@ -259,7 +257,7 @@ def _build_hash_sequence_dense(layers, dropout, n_bits):
 
 
 def build_dhs_net_small_filters(input_shape, input_mean, input_std,
-                                downsample_frequency, dropout, n_conv=3,
+                                downsample_frequency, n_conv=3,
                                 n_bits=N_BITS):
     '''
     Construct a list of layers of a network for mapping sequences of feature
@@ -276,8 +274,6 @@ def build_dhs_net_small_filters(input_shape, input_mean, input_std,
         Training set standard deviation, to standardize inputs with.
     downsample_frequency : bool
         Whether to max-pool over frequency
-    dropout : bool
-        Should dropout be applied between fully-connected layers?
     n_conv : int
         Number of convolutional/pooling layer groups
     n_bits : int
@@ -292,7 +288,7 @@ def build_dhs_net_small_filters(input_shape, input_mean, input_std,
     layers = _build_input(input_shape, input_mean, input_std)
     layers = _build_small_filters_frontend(
         layers, downsample_frequency, n_conv)
-    layers = _build_hash_sequence_dense(layers, dropout, n_bits)
+    layers = _build_hash_sequence_dense(layers, n_bits)
     return layers
 
 
@@ -338,7 +334,7 @@ def _build_big_filter_frontend(layers, downsample_frequency, n_conv):
 
 
 def build_dhs_net_big_filter(input_shape, input_mean, input_std,
-                             downsample_frequency, dropout, n_conv=3,
+                             downsample_frequency, n_conv=3,
                              n_bits=N_BITS):
     '''
     Construct a list of layers of a network for mapping sequences of feature
@@ -356,8 +352,6 @@ def build_dhs_net_big_filter(input_shape, input_mean, input_std,
         Training set standard deviation, to standardize inputs with.
     downsample_frequency : bool
         Whether to max-pool over frequency
-    dropout : bool
-        Should dropout be applied between fully-connected layers?
     n_conv : int
         Number of convolutional/pooling layer groups
     n_bits : int
@@ -372,11 +366,11 @@ def build_dhs_net_big_filter(input_shape, input_mean, input_std,
     layers = _build_input(input_shape, input_mean, input_std)
     layers = _build_big_filter_frontend(
         layers, downsample_frequency, n_conv)
-    layers = _build_hash_sequence_dense(layers, dropout, n_bits)
+    layers = _build_hash_sequence_dense(layers, n_bits)
     return layers
 
 
-def _build_ff_attention_dense(layers, n_attention, dropout, output_dim):
+def _build_ff_attention_dense(layers, n_attention, output_dim):
     # Combine the "n_channels" dimension with the "n_features"
     # dimension
     layers.append(lasagne.layers.DimshuffleLayer(layers[-1], (0, 2, 1, 3)))
@@ -397,13 +391,11 @@ def _build_ff_attention_dense(layers, n_attention, dropout, output_dim):
     layers += attention_layers
     # Concatenate all attention layers
     layers.append(lasagne.layers.ConcatLayer(attention_layers))
-    # Add dense hidden layers and optionally dropout
+    # Add dense hidden layers
     for hidden_layer_size in [N_HIDDEN, N_HIDDEN]:
         layers.append(lasagne.layers.DenseLayer(
             layers[-1], num_units=hidden_layer_size,
             nonlinearity=lasagne.nonlinearities.rectify))
-        if dropout:
-            layers.append(lasagne.layers.DropoutLayer(layers[-1], .5))
     # Add output layer
     layers.append(lasagne.layers.DenseLayer(
         layers[-1], num_units=output_dim,
@@ -412,7 +404,7 @@ def _build_ff_attention_dense(layers, n_attention, dropout, output_dim):
 
 
 def build_pse_net_big_filter(input_shape, input_mean, input_std,
-                             downsample_frequency, n_attention, dropout,
+                             downsample_frequency, n_attention,
                              n_conv=3, output_dim=OUTPUT_DIM):
     '''
     Construct a list of layers of a network which embeds sequences in a
@@ -432,8 +424,6 @@ def build_pse_net_big_filter(input_shape, input_mean, input_std,
         Whether to max-pool over frequency
     n_attention : int
         Number of attention layers
-    dropout : bool
-        Should dropout be applied between fully-connected layers?
     n_conv : int
         Number of convolutional/pooling layer groups
     output_dim : int
@@ -449,12 +439,12 @@ def build_pse_net_big_filter(input_shape, input_mean, input_std,
     layers = _build_big_filter_frontend(
         layers, downsample_frequency, n_conv)
     layers = _build_ff_attention_dense(
-        layers, n_attention, dropout, output_dim)
+        layers, n_attention, output_dim)
     return layers
 
 
 def build_pse_net_small_filters(input_shape, input_mean, input_std,
-                                downsample_frequency, n_attention, dropout,
+                                downsample_frequency, n_attention,
                                 n_conv=3, output_dim=OUTPUT_DIM):
     '''
     Construct a list of layers of a network which embeds sequences in a
@@ -473,8 +463,6 @@ def build_pse_net_small_filters(input_shape, input_mean, input_std,
         Whether to max-pool over frequency
     n_attention : int
         Number of attention layers
-    dropout : bool
-        Should dropout be applied between fully-connected layers?
     n_conv : int
         Number of convolutional/pooling layer groups
     output_dim : int
@@ -490,7 +478,7 @@ def build_pse_net_small_filters(input_shape, input_mean, input_std,
     layers = _build_small_filters_frontend(
         layers, downsample_frequency, n_conv)
     layers = _build_ff_attention_dense(
-        layers, n_attention, dropout, output_dim)
+        layers, n_attention, output_dim)
     return layers
 
 
