@@ -16,7 +16,7 @@ DATA_PATH = '../../data'
 SPLIT = 'dev'
 # DTW parameters
 GULLY = .9
-PENALTY = 4
+PENALTY = 15
 # Ignore all hash sequences below this length (they cause issues)
 MIN_SEQUENCE_LENGTH = 30
 # A DP score above this means the alignment is correct
