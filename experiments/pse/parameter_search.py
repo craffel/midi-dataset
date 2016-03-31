@@ -12,11 +12,10 @@ RESULTS_PATH = '../../results'
 if __name__ == '__main__':
     # Define hyperparameter space
     space = {
-        'momentum': {'type': 'float', 'min': 0., 'max': 1.},
-        'negative_threshold': {'type': 'int', 'min': 1, 'max': 100},
-        'learning_rate': {'type': 'float', 'min': .000001, 'max': .01},
-        'negative_importance': {'type': 'float', 'min': 0.01, 'max': 4.},
-        'output_l2_penalty': {'type': 'float', 'min': 0.0, 'max': 4.},
+        'momentum': {'type': 'float', 'min': 0., 'max': 0.999},
+        'negative_threshold': {'type': 'float', 'min': .01, 'max': 10},
+        'learning_rate': {'type': 'float', 'min': 1e-6, 'max': 1e-4},
+        'negative_importance': {'type': 'float', 'min': 0.01, 'max': 100.},
         'n_conv': {'type': 'int', 'min': 0, 'max': 3},
         'n_attention': {'type': 'int', 'min': 1, 'max': 4},
         'network': {'type': 'enum',

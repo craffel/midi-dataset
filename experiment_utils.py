@@ -55,6 +55,7 @@ def run_trial(params, data_directory, train_function):
     # Fill in default parameter values which may not be used by all experiments
     params['n_conv'] = params.get('n_conv', 3)
     params['downsample_frequency'] = params.get('downsample_frequency', True)
+    params['output_l2_penalty'] = params.get('output_l2_penalty', 0.0)
     # Load in data as dictionary of dictionaries
     data = {'X': collections.defaultdict(list),
             'Y': collections.defaultdict(list)}
