@@ -568,6 +568,44 @@ def match_sequence(midi_data, msd_data, msd_match_indices, gully, penalty):
     return results
 
 
+def match_embedding(midi_data, msd_data, msd_match_indices):
+    '''
+    Match a MIDI embedding against the MSD and evaluate whether a good match was
+    found
+
+    Parameters
+    ----------
+    midi_data : dict
+        Dict of MIDI data, including embedding
+    sequences : list of dict
+        List of MSD entries (embedding, metadata) to match against
+    msd_match_indices : list-like of int
+        Indices of entries in the sequences this MIDI should potentially match
+
+    Returns
+    -------
+    results : dict
+        Dictionary with diagnostics about whether this match was successful
+    '''
+    # Create a big matrix of the embeddings
+    msd_embeddings = np.concatenate([d['embedding'] for d in msd_data], axis=0)
+    # Get the distance between the MIDI embedding and all MSD entries
+    distances = np.sum((msd_embeddings - midi_data['embedding'])**2, axis=1)
+    # Get the indices of MSD entries sorted by their embedded distance to the
+    # query MIDI embedding.
+    matches = np.argsort(distances)
+    # Store results of the match
+    results = {}
+    results['midi_md5'] = midi_data['id']
+    results['msd_match_ids'] = [msd_data[n]['id'] for n in msd_match_indices]
+    # Compile the rank and score for each MSD entry which should match the MIDI
+    results['msd_match_ranks'] = [np.flatnonzero(matches == msd_index)[0]
+                                  for msd_index in msd_match_indices]
+    results['msd_match_distances'] = [
+        distances[rank] for rank in results['msd_match_ranks']]
+    return results
+
+
 def load_valid_midi_datas(midi_msd_mapping, msd_data, midi_list, data_path):
     """
     Load precomputed represented for all valid-matched MIDI files, and also
