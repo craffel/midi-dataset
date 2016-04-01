@@ -59,8 +59,7 @@ if __name__ == '__main__':
             # We will supply placeholders here but load in the values below
             np.zeros((1, feature_extraction.N_NOTES), theano.config.floatX),
             np.ones((1, feature_extraction.N_NOTES), theano.config.floatX),
-            hyperparameters['downsample_frequency'],
-            hyperparameters['dropout'])
+            hyperparameters['downsample_frequency'])
         # Load in network parameter values
         lasagne.layers.set_all_param_values(
             layers[-1], network_params[network])
