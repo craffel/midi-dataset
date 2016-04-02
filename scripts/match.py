@@ -1,7 +1,7 @@
 '''
 Code for matching one or more MIDI files to the MSD
 Call it like this:
-    python match.py ../data/unique_midi/mid/0/\*.mid
+    python match.py ../data/unique_midi/mid/0/\*.mid output_path
 '''
 
 import dhs
@@ -258,8 +258,7 @@ if __name__ == '__main__':
     midi_filenames = glob.glob(sys.argv[1])
     # Construct output filenames
     output_filenames = [
-        os.path.join(RESULTS_PATH, 'unique_midi_matched',
-                     os.path.split(f)[1][0],
+        os.path.join(sys.argv[2],
                      os.path.splitext(os.path.split(f)[1])[0] + '.mpk')
         for f in midi_filenames]
     # Construct intermediate directories for all output filenames
