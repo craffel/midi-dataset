@@ -127,8 +127,10 @@ def match_one_midi(midi_filename, embed_fn, hash_fn, msd_embeddings,
             continue
         # Get distance matrix
         distance_matrix = 1 - np.dot(midi_gram, audio_features['gram'].T)
-        # Non-diagonal additive path penalty is the median of the sim mtx
-        add_pen = np.median(distance_matrix)
+        # Non-diagonal additive path penalty is the mean of the sim mtx
+        # Note that we typically use a median here, but a mean is faster and
+        # produces close enough results
+        add_pen = np.mean(distance_matrix)
         # Get best path through matrix
         aligned_midi_indices, aligned_audio_indices, score = djitw.dtw(
             distance_matrix, gully=.96, additive_penalty=add_pen,
