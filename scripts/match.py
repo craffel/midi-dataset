@@ -158,6 +158,8 @@ if __name__ == '__main__':
     trial_files = glob.glob(os.path.join(
         RESULTS_PATH, 'pse_parameter_trials', '*.h5'))
     trials = [deepdish.io.load(f) for f in trial_files]
+    # Ignore trials with NaN objective
+    trials = [t for t in trials if not np.isnan(t['best_objective'])]
     # Get the hyperparameters for the trial with the lowest objective value
     best_trial = sorted(trials, key=lambda t: t['best_objective'])[0]
     hyperparameters = best_trial['hyperparameters']
@@ -193,6 +195,8 @@ if __name__ == '__main__':
     trial_files = glob.glob(os.path.join(
         RESULTS_PATH, 'dhs_parameter_trials', '*.h5'))
     trials = [deepdish.io.load(f) for f in trial_files]
+    # Ignore trials with NaN objective
+    trials = [t for t in trials if not np.isnan(t['best_objective'])]
     # Get the hyperparameters for the trial with the lowest objective value
     best_trial = sorted(trials, key=lambda t: t['best_objective'])[0]
     hyperparameters = best_trial['hyperparameters']
