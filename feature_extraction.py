@@ -45,8 +45,8 @@ def fast_fluidsynth(m, fs):
     # Make system call to fluidsynth
     with open(os.devnull, 'w') as devnull:
         subprocess.check_output(
-            ['fluidsynth', '--fast-render={}'.format(temp_wav.name),
-             '-r', str(fs), sf2_path, temp_mid.name], stderr=devnull)
+            ['fluidsynth', '-F', temp_wav.name, '-r', str(fs), sf2_path,
+             temp_mid.name], stderr=devnull)
     # Load from temp wav file
     audio, _ = librosa.load(temp_wav.name, sr=fs)
     # Close/delete temp files
