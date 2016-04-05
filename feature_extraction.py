@@ -49,6 +49,9 @@ def fast_fluidsynth(m, fs):
              temp_mid.name], stderr=devnull)
     # Load from temp wav file
     audio, _ = librosa.load(temp_wav.name, sr=fs)
+    # Occasionally, fluidsynth pads a lot of silence on the end, so here we
+    # crop to the length of the midi object
+    audio = audio[:int(m.get_end_time() * fs)]
     # Close/delete temp files
     temp_mid.close()
     temp_wav.close()
