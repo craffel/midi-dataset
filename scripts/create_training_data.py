@@ -13,6 +13,7 @@ import joblib
 import feature_extraction
 import deepdish
 import traceback
+import librosa
 
 # A DP score below this means the alignment is bad
 SCORE_THRESHOLD = .5
@@ -20,7 +21,7 @@ RESULTS_PATH = '../results'
 
 
 def process_one_file(diagnostics_file, output_filename,
-                     output_filename_unaligned):
+                     output_filename_unaligned, output_filename_piano_roll):
     # If the alignment failed and there was no diagnostics file, return
     if not os.path.exists(diagnostics_file):
         return
@@ -67,6 +68,25 @@ def process_one_file(diagnostics_file, output_filename,
         deepdish.io.save(
             output_filename, {'X': midi_gram[np.newaxis],
                               'Y': audio_gram[np.newaxis]})
+
+        piano_roll = pm_aligned.get_piano_roll(times=midi_frame_times)
+        # Only utilize the same notes which are used in the CQT
+        piano_roll = piano_roll[
+            feature_extraction.NOTE_START:
+            feature_extraction.NOTE_START + feature_extraction.N_NOTES]
+        # Transpose so that the first dimension is time
+        piano_roll = piano_roll.T
+        # L2 normalize columns
+        piano_roll = librosa.util.normalize(piano_roll, norm=2, axis=1)
+        # Mask out times within the aligned region
+        piano_roll = piano_roll[
+            np.logical_and(midi_frame_times >= start_time,
+                           midi_frame_times <= end_time)]
+        # Use float32 for Theano
+        piano_roll = piano_roll.astype(np.float32)
+        deepdish.io.save(
+            output_filename_piano_roll, {'X': piano_roll[np.newaxis],
+                                         'Y': audio_gram[np.newaxis]})
     except Exception as e:
         print "Error for {}: {}".format(
             diagnostics_file, traceback.format_exc(e))
@@ -104,6 +124,10 @@ if __name__ == '__main__':
             RESULTS_PATH, 'training_dataset_unaligned', dataset, 'h5')
         if not os.path.exists(output_path_unaligned):
             os.makedirs(output_path_unaligned)
+        output_path_piano_roll = os.path.join(
+            RESULTS_PATH, 'training_dataset_piano_roll', dataset, 'h5')
+        if not os.path.exists(output_path_piano_roll):
+            os.makedirs(output_path_piano_roll)
         # Load in all pairs for this split
         pair_file = os.path.join(
             RESULTS_PATH, '{}_pairs.csv'.format(dataset))
@@ -116,5 +140,7 @@ if __name__ == '__main__':
                 os.path.join(aligned_path, '{}_{}_{}.h5'.format(*pair)),
                 os.path.join(output_path, '{}_{}_{}.h5'.format(*pair)),
                 os.path.join(output_path_unaligned,
+                             '{}_{}_{}.h5'.format(*pair)),
+                os.path.join(output_path_piano_roll,
                              '{}_{}_{}.h5'.format(*pair)))
             for pair in pairs)
