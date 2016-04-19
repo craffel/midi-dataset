@@ -36,7 +36,7 @@ MAX_FRAMES = 10000
 MIN_SEQUENCE_LENGTH = 30
 
 
-def match_one_midi(midi_filename, embed_fn, hash_fn, msd_embeddings,
+def match_one_file(midi_filename, embed_fn, hash_fn, msd_embeddings,
                    msd_sequences, msd_feature_paths, msd_ids, output_filename):
     """
     Match one MIDI file to the million song dataset by computing its CQT,
@@ -57,7 +57,7 @@ def match_one_midi(midi_filename, embed_fn, hash_fn, msd_embeddings,
     msd_sequences : list of np.ndarray
         List of binary vector sequences (represented as ints) for all MSD
         entries
-    msd_feature_paths` : list of str
+    msd_feature_paths : list of str
         Path to feature files (containing CQT) for each MSD entry
     msd_ids : list of str
         MSD ID of each corresponding entry in the above lists
@@ -83,6 +83,50 @@ def match_one_midi(midi_filename, embed_fn, hash_fn, msd_embeddings,
         return
     # Compute the embedding of the CQT
     midi_embedding = embed_fn(midi_gram.reshape(1, 1, *midi_gram.shape))
+    # Compute the hash sequence
+    midi_hash_sequence = hash_fn(midi_gram.reshape(1, 1, *midi_gram.shape))
+    # Convert to sequence of integers
+    midi_hash_sequence = dhs.vectors_to_ints(midi_hash_sequence > 0)
+    midi_hash_sequence = midi_hash_sequence.astype(np.uint32)
+    matches = match_one_midi(
+        midi_gram, midi_embedding, midi_hash_sequence, msd_embeddings,
+        msd_sequences, msd_feature_paths, msd_ids)
+    # Write out the result
+    with open(output_filename, 'wb') as f:
+        msgpack.dump(matches, f)
+
+
+def match_one_midi(midi_gram, midi_embedding, midi_hash_sequence,
+                   msd_embeddings, msd_sequences, msd_feature_paths, msd_ids):
+    """
+    Match one MIDI file to the million song dataset by computing its CQT,
+    pruning by matching its embedding, re-pruning by matching its downsampled
+    hash sequence, and finally doing DTW on CQTs on the remaining entries.
+
+    Parameters
+    ----------
+    midi_gram : np.ndarray
+        Synthesized MIDI CQT
+    midi_embedding : np.ndarray
+        Embedding of the synthesized MIDI CQT
+    midi_hash_sequence : np.ndarray
+        Downsampled hash sequence of the MIDI CQT
+    msd_embeddings : np.ndarray
+        (# MSD entries x embedding dimension) matrix of all embeddings for all
+        entries from the MSD
+    msd_sequences : list of np.ndarray
+        List of binary vector sequences (represented as ints) for all MSD
+        entries
+    msd_feature_paths : list of str
+        Path to feature files (containing CQT) for each MSD entry
+    msd_ids : list of str
+        MSD ID of each corresponding entry in the above lists
+
+    Returns
+    -------
+    dtw_matches : list of list
+        List of [msd_id, score] for all non-pruned MSD entries
+    """
     # Get the distance between the MIDI embedding and all MSD entries
     embedding_distances = np.sum((msd_embeddings - midi_embedding)**2, axis=1)
     # Get the indices of MSD entries sorted by their embedded distance to the
@@ -90,11 +134,6 @@ def match_one_midi(midi_filename, embed_fn, hash_fn, msd_embeddings,
     embedding_matches = np.argsort(embedding_distances)
     # Get the top N matches
     embedding_matches = embedding_matches[:TOP_EMBEDDINGS]
-    # Compute the hash sequence
-    midi_hash_sequence = hash_fn(midi_gram.reshape(1, 1, *midi_gram.shape))
-    # Convert to sequence of integers
-    midi_hash_sequence = dhs.vectors_to_ints(midi_hash_sequence > 0)
-    midi_hash_sequence = midi_hash_sequence.astype(np.uint32)
     # Match this hash sequence to MSD sequences
     hash_matches, _, _ = dhs.match_one_sequence(
         midi_hash_sequence, msd_sequences, GULLY, PENALTY, True,
@@ -111,17 +150,16 @@ def match_one_midi(midi_filename, embed_fn, hash_fn, msd_embeddings,
             audio_features = deepdish.io.load(audio_features_filename)
         except Exception as e:
             print "Error loading CQT for {}: {}".format(
-                os.path.split(midi_filename)[1], traceback.format_exc(e))
+                os.path.split(audio_features_filename)[1],
+                traceback.format_exc(e))
             continue
         # Check that the distance matrix will not be too big before computing
         size = midi_gram.shape[0] * audio_features['gram'].shape[0]
         # If > 1 GB, skip
         if (size * 64 / 8e9 > 2):
             print (
-                "Distance matrix for {} and {} would be {} GB because the "
+                "Distance matrix would be {} GB because the "
                 "CQTs have shape {} and {}".format(
-                    os.path.split(audio_features_filename)[1],
-                    os.path.split(midi_filename)[1],
                     size * 64 / 8e9, audio_features['gram'].shape[0],
                     midi_gram.shape[0]))
             continue
@@ -147,9 +185,7 @@ def match_one_midi(midi_filename, embed_fn, hash_fn, msd_embeddings,
         # very good alignment.
         score = np.clip(2 * (1 - score), 0, 1)
         matches.append([msd_ids[match], score])
-    # Write out the result
-    with open(output_filename, 'wb') as f:
-        msgpack.dump(matches, f)
+    return matches
 
 
 if __name__ == '__main__':
@@ -274,5 +310,5 @@ if __name__ == '__main__':
 
     # Match each of the files
     for midi_fname, output_fname in zip(midi_filenames, output_filenames):
-        match_one_midi(midi_fname, embed_fn, hash_fn, msd_embeddings,
+        match_one_file(midi_fname, embed_fn, hash_fn, msd_embeddings,
                        msd_sequences, msd_feature_paths, msd_ids, output_fname)
