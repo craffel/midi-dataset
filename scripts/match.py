@@ -24,7 +24,7 @@ import experiment_utils
 RESULTS_PATH = '../results'
 DATA_PATH = '../data'
 # Keep the MSD entries which had the N smallest embedding distance
-TOP_EMBEDDINGS = 10000
+TOP_EMBEDDINGS = 100000
 # Keep the MSD entries which had the N smallest hash sequence distance
 TOP_SEQUENCES = 250
 # Parameters for hash sequence DTW
