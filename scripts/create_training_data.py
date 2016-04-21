@@ -14,6 +14,7 @@ import feature_extraction
 import deepdish
 import traceback
 import librosa
+import shutil
 
 # A DP score below this means the alignment is bad
 SCORE_THRESHOLD = .5
@@ -118,16 +119,22 @@ if __name__ == '__main__':
         # Create output paths for this dataset split
         output_path = os.path.join(
             RESULTS_PATH, 'training_dataset', dataset, 'h5')
-        if not os.path.exists(output_path):
-            os.makedirs(output_path)
+        # Remove the dataset folder if it exists.  This prevents pollution of
+        # the train/test split if this script is run, then
+        # split_training_data.py is run, and then this script again.
+        if os.path.exists(output_path):
+            shutil.rmtree(output_path)
+        os.makedirs(output_path)
         output_path_unaligned = os.path.join(
             RESULTS_PATH, 'training_dataset_unaligned', dataset, 'h5')
-        if not os.path.exists(output_path_unaligned):
-            os.makedirs(output_path_unaligned)
+        if os.path.exists(output_path_unaligned):
+            shutil.rmtree(output_path_unaligned)
+        os.makedirs(output_path_unaligned)
         output_path_piano_roll = os.path.join(
             RESULTS_PATH, 'training_dataset_piano_roll', dataset, 'h5')
-        if not os.path.exists(output_path_piano_roll):
-            os.makedirs(output_path_piano_roll)
+        if os.path.exists(output_path_piano_roll):
+            shutil.rmtree(output_path_piano_roll)
+        os.makedirs(output_path_piano_roll)
         # Load in all pairs for this split
         pair_file = os.path.join(
             RESULTS_PATH, '{}_pairs.csv'.format(dataset))
