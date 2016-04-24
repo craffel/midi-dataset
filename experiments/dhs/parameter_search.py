@@ -15,7 +15,7 @@ if __name__ == '__main__':
     space = {
         'momentum': {'type': 'float', 'min': 0., 'max': 1.},
         'negative_threshold': {'type': 'int', 'min': 1, 'max': 16},
-        'learning_rate': {'type': 'float', 'min': .0001, 'max': .01},
+        'learning_rate': {'type': 'float', 'min': .000001, 'max': .01},
         'negative_importance': {'type': 'float', 'min': 0.01, 'max': 20.},
         'output_l2_penalty': {'type': 'float', 'min': 0.0, 'max': 1.},
         'downsample_frequency': {'type': 'int', 'min': 0, 'max': 1},
