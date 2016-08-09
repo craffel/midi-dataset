@@ -1,46 +1,71 @@
-## MIDI Dataset
+MIDI Dataset
 
-The goal of this project is to match and align a very large collection of MIDI files to very large collections of audio files so that the MIDI data can be used to infer ground truth information about the audio.
+The goal of this project is to match and align a very large collection of MIDI files to a very large collection of audio files so that the MIDI data can be used to infer ground truth information about the audio.  Alternatively, this repository contains code for reproducing most of the results in [1], which describes the goals, ideas, and research behind this project in much greater detail.
 
-*Note* - this repository/experiment is undergoing some restructuring, so the description below may no longer apply in places.  If you're looking for the version of this repository used in the experiments in [Large-Scale Content-Based Matching of MIDI and Audio Files](http://colinraffel.com/publications/ismir2015large.pdf), check [this tag](https://github.com/craffel/midi-dataset/releases/tag/v0.1.0).
+### Notes
 
-### Datasets
+- If you're looking for a high-level overview of the techniques used in this project and the results, take a look at chapter 1 of my thesis [1].
 
-Each dataset is contained in a folder in `data`.  Each dataset has the following:
+- This repository contains code for performing the matching; if you're looking for the "Lakh MIDI Dataset" itself (the result of using this code to match a collection of 178,561 MIDI files to the Million Song Dataset), you can find that [here](http://colinraffel.com/projects/lmd).
 
-- A .js file describing the contents.  This json file is essentially a list of dicts, where each dict describes one song in the dataset, including its metadata and path.  See below for information about how these were created.
-- A whoosh index.  This allows the dataset to be searched in a (barely) fuzzy manner.  See below for information about how these were created.
-- Data.  The data is organized by filetype, e.g. `data/cal500/mp3` contains all of the .mp3 files for cal500.  Each dataset has at least one of the following: mp3, mid, h5 (MSD metadata/features), npz (e.g. cached features computed with `librosa` or alignment results).
+- If you just want a tutorial on potential uses of the Lakh MIDI dataset, take a look at the [Tutorial.ipynb](http://nbviewer.jupyter.org/github/craffel/midi-dataset/blob/master/Tutorial.ipynb) notebook.
 
-The datasets are as follows:
+- Over time, this project has undergone some restructuring; if you're looking for the version of this repository used in the experiments in [2], check [this tag](https://github.com/craffel/midi-dataset/releases/tag/v0.1.0).
 
-MIDI:
+### Prerequisites
 
-1. Full MIDI dataset, in `data/midi`.  This is the full collection of MIDI files scraped off the internet.  Because we're assuming we don't know anything about the metadata of these files, there's no .js file or whoosh index (yet?).
-1. Clean MIDI dataset, in `data/clean_midi`.  This is a subset of the full MIDI dataset which has reasonable artist/title file naming, i.e. the song "Some Song" by the artist "An Artist" should be in `data/clean_midi/An Artist/Some Song.mid`.  For information about how this dataset was collected, see below (under "process").  Entries in the .js file include artist, title, md5 of the MIDI file, and file base path.
-1. Clean MIDI dataset aligned to baseline mp3 collections (see below), in `data/clean_midi_aligned`.  This data is created as part of this experiment and includes both aligned MIDI files and .npz files which contain the results of and diagnostic information about the alignment.
+Before utilizing the code in this repository, you need to gather some data and software.
 
-Baseline mp3 collections matched to Echonest/MSD analysis (see [here](http://labrosa.ee.columbia.edu/millionsong/pages/additional-datasets))
+#### Data
 
-1. cal500, in `data/cal500/`.  This is the cal500 dataset, meant for music autotagging.  Entries in the .js file include artist, title, and file base path.
-1. cal10k, in `data/cal10k/`.  The cal10k dataset, also for autotagging.  Entries in the .js file include artist, title, matched echonest ID (from `EchoNestTrackIDs.tab`, found by querying Echonest), and file base path.
-1. uspop2002, in `data/uspop2002`.  The uspop2002 dataset, for artist recognition/similarity estimation.  Entries in the .js file include artist, title, album, and file base path.
+Create a folder called `data` in the root of this repository.  In it, you need the following subdirectories:
 
-The MSD:
+* `clean_midi`, which should contain the "clean MIDI subset", as described in section 5.2.1 of [1].  These MIDI files should live in `data/clean_midi/mid`.  You can obtain this collection [here](http://colinraffel.com/projects/lmd/).
+* `unique_midi`, which should contain LMD-full, the 176,581 files of the Lakh MIDI dataset (aka `LMD-full`).  These MIDI files should live in `data/unique_midi/mid`.  You can obtain this collection [here](http://colinraffel.com/projects/lmd/).
+* `uspop2002`, `cal10k`, `cal500`, and `msd`, which should each contain audio files from each respective dataset (`msd` being the 7digital preview clips corresponding to the Million Song Dataset).  The MP3 files should live in, e.g., `data/uspop2002/mp3`.  Unfortunately, obtaining these MP3 files is non-trivial.  If you need help tracking them down, please contact me directly.
 
-1. The Million Song Dataset, in `data/msd`.  Includes metadata, Echonest features, and 7digital preview mp3s for 1,000,000 songs.  Entries in the .json file include artist, title, song ID, track ID, and base file path.
+#### File lists
+All of the datasets in the `data` subdirectory (except for `unique_midi`) should have a corresponding file list in the `file_lists` subdirectory.  The only one which is not included in this repository is `msd.txt`; you can obtain that from the MSD directly (it's distributed with the MSD as `unique_tracks.txt`) or you can also download it [here](http://labrosa.ee.columbia.edu/millionsong/sites/default/files/AdditionalFiles/unique_tracks.txt) and rename `msd.txt`.
 
+#### Software
+
+All of the code in this repository is written for Python 2.7; it will likely need modification to work with Python 3.x.  Here is a potentially incomplete list of the Python libraries used in this project:
+
+* `numpy`
+* `scipy`
+* `librosa`
+* `pretty_midi`
+* `whoosh`
+* `joblib`
+* `deepdish`
+* `dhs`
+* `pse`
+* `msgpack`
+* `msgpack_numpy`
+* `lasagne`
+* `theano`
+* `sklearn`
+* `djitw`
+* `simple_spearmint`
+* `spearmint`
 
 ### Process
 
-1. About 500,000 MIDI files were scraped from the internet.  About half of them are duplicates.  Metadata (specifically, song title and artist) is sometimes included in MIDI files as text meta events, but more frequently the filename/subdirectory is used as a way of denoting the artist/song title.
-1. We manually found about 25,000 non-duplicate MIDI files which had clean metadata information in their filename/subdirectory.  We did some manual cleaning/merging to make their "metadata" as sane as possible.
-1. For each file in the "clean MIDI subset", we resolved the purported artist/title name against Freebase and the Echonest.  Code for this step is in `normalize_names.py`.  This resulted in about 17,000 MIDI files for about 9,000 unique tracks.
-1. Using the file lists (typically supplied with the datasets), we created .js files describing the contents of each dataset.  This is primarily to keep track of metadata for each file in the dataset in a sane/consistent way.  Code for this step is in `json_utils.py`.
-1. For each of the datasets, we created Whoosh indices.  These are used to match an entry in one dataset (usually the clean MIDI dataset) to an entry in another (one of cal500, cal10k, uspop2002, or MSD).  Code for this step is in `whoosh_search.py`.
-1. Using Whoosh, we matched each entry in the clean MIDI subset to mp3 files from cal500/cal10k/uspop2002.  For the files that matched, we attempted to align the MIDI file to the matching audio file (using [align_midi](https://github.com/craffel/align_midi)).  Code for this step is in `midi_alignment.py`.  This resulted in about 5,000 MIDI-MP3 matches, about 2,000 of which correspond to unique songs.
-1. Once we ran the alignment, we manually verified whether the alignment was successful or not for a subset of the matches.  Using this labeling, we determined a threshold for the alignment dynamic programming cost under which an alignment could be safely considered correct.
-1. For those audio/MIDI pairs which had good alignments (i.e. with a DP score below the threshold), we extracted the Echonest analysis features from the accompanying .h5 file and a piano-roll representation from the .mid file, thereby creating a dataset of aligned MIDI and Echonest/MSD features.  This resulted in about 3,000 echonest feature/MIDI piano roll pairs for the chosen threshold.  Code for this step is in `create_hashing_dataset.py`
-1. Using this cross-modality hashing dataset, we trained a siamenese neural net architecture to map aligned feature vectors from each modality (Echonest/MSD features and MIDI piano roll) to a common binary space (see e.g. "Multimodal similarity-preserving hashing", Masci et al.).  Code for this step is in `cross_modality_hashing.py` (TODO: re-write using nntools, different architectures)
-1. Using the trained neural network, we mapped MIDI files with no good metadata to entries in the MSD. (TODO)
-1. Once we obtained matched MIDI file <-> MSD entry pairs, we aligned the corresponding 7digital/wcd audio to the MIDI file.  From here, we can obtain (approximate) ground-truth information (e.g. chords, beats, transcription, key, tempo, etc) for the corresponding MIDI files. (TODO)
+The general structure of this repository is as follows: Collections of shared utilities (`experiment_utils.py`, `feature_extraction.py`, `whoosh_search.py`) live in the base level, one-time-use scripts for assembling data and performing the actual MIDI-to-audio matching live in the `scripts` directory, and experiments for evaluating the effectiveness of different matching techniques live in `experiments`.  Any data/results generated by running these different files are written out to a `results` directory.  To re-run all of the experiments, matching, etc., proceed as described below.  Please note that running all of these steps from beginning to end will take a least a few weeks of compute time on a reasonably powerful many-core'd computer; longer if you do not also have a hefty GPU.
+
+1. Run `create_whoosh_indices.py`.  This uses the file lists to create Whoosh indices, which allow for fuzzy text matching of metadata.  We use this fuzzy text matching to create training data for different matching algorithms.  The indices are written out to, e.g., `data/msd/index/`.
+1. Run `text_match_datasets.py`.  This uses the Whoosh indices to match MIDI files from `clean_midi` (which ostensibly may have reliable metadata) to entries in the different audio datasets.  It also takes care to group audio files which are recordings of the same song.  The results are written to `results/text_matches.js`.
+1. Run `create_msd_cqts.py`.  This pre-computes constant-Q spectrograms for every entry in the Million Song Dataset, which saves time later on as we will need these for various steps throughout the process.  They are written to `data/msd/h5`.
+1. Run `align_text_matches.py`.  This uses dynamic time warping (specifically the approach proposed in [3]) to align each MIDI-audio pair found by metadata matching.  The results are written to `results/clean_midi_aligned`, and include both the aligned MIDI files in `results/clean_midi_aligned/mid` and "diagnostics files" in `results/clean_midi_aligned/h5`.  The diagnostics files contain information about whether each match is truly a match (an incorrect match can be caused e.g. by incorrect metadata or a bad transcription).
+1. Run `split_training_data.py`.  This splits the matches into train, validation, development, and test collections which are used for evaluating each of the different matching approaches implemented in `experiments`.
+1. Run `create_training_data.py`.  This inspects the results of `align_text_matches.py` to find good matches and generates training data for different matching approaches in a convenient format.  It essentially produces saved constant-Q spectrograms of audio files, aligned MIDI files, unaligned MIDI files, and aligned MIDI piano rolls, in various folders in `results`.
+1. Run the experiments!  Each subdirectory in the `experiments` directory corresponds to a different MIDI-audio matching technique.  Each of these experiments at least contains a script called `match_msd.py`, which uses the matching technique to match each MIDI file in either the development or test set to the MSD and writes out the results.  Most of the experiments have a script called `precompute.py`, which precomputes any necessary features/representation of entries in the development and test set.  Finally, those experiments which are based on machine learning techniques also have a script `parameter_search.py` which trains any models necessary for performing the matching.  In short, to run each of these experiments, run `parameter_search.py` if it exists, run `precompute.py`, and finally run `match_msd.py`.  The results can be used to measure the effectiveness of each approach.  There isn't a script which performs this analysis automatically, but there is a great deal of analysis in my thesis [1].
+1. To actually match the `unique_midi` collection to the Million Song Dataset, use the `match.py` script.  For flexibility, this script takes a few command line arguments - first, a glob to MIDI files you want to match, and second, a path to where to write the results.  To match the entire `unique_midi` dataset to the MSD, call it like so: `python match.py ../data/unique_midi/mid/*/\*.mid output_path`.  This will produce (in `output_path`) one file for each MIDI file processed which lists potential matches in the MSD and the corresponding confidence scores.
+1. To assemble a collection of matched-and-aligned MIDI files, use the script `assemble_aligned_matches.py`.  This will find all MIDI-audio matches produced by `match.py` which have a sufficiently high confidence score, re-align them, and write out the aligned MIDI file, along with the unaligned MIDI, MP3 file, and MSD H5, for convenience.  In essence, this is how, at long last, each component of the Lakh MIDI dataset is produced.
+
+### References
+
+1. Colin Raffel.  ["Learning-Based Methods for Comparing Sequences, with Applications to Audio-to-MIDI Alignment and Matching"](http://colinraffel.com/publications/thesis.pdf). PhD Thesis, 2016.
+1. Colin Raffel and Daniel P. W. Ellis. ["Large-Scale Content-Based Matching of MIDI and Audio Files"](http://colinraffel.com/publications/ismir2015large.pdf).  Proceedings of the 16th International Society for Music Information Retrieval Conference, 2015.
+1. Colin Raffel and Daniel P. W. Ellis. ["Optimizing DTW-Based Audio-to-MIDI Alignment and Matching"](http://colinraffel.com/publications/icassp2016optimizing.pdf).  Proceedings of the 41st IEEE International Conference on Acoustics, Speech and Signal Processing, 2016.
+1. Colin Raffel and Daniel P. W. Ellis. ["Pruning Subsequence Search with Attention-Based Embedding"](http://colinraffel.com/publications/icassp2016pruning.pdf).  Proceedings of the 41st IEEE International Conference on Acoustics, Speech and Signal Processing, 2016.
