@@ -1,4 +1,4 @@
-MIDI Dataset
+## MIDI Dataset
 
 The goal of this project is to match and align a very large collection of MIDI files to a very large collection of audio files so that the MIDI data can be used to infer ground truth information about the audio.  Alternatively, this repository contains code for reproducing most of the results in [1], which describes the goals, ideas, and research behind this project in much greater detail.
 
@@ -51,7 +51,7 @@ All of the code in this repository is written for Python 2.7; it will likely nee
 
 #### Hardware
 
-All of this code was designed to be run on a server with 64 GB of ram, 12 CPU cores, an NVIDIA GTX 980 Ti GPU, and plenty of hard drive space.  If your own setup has less resources, you may need to modify some of the scripts in various places so that they use an appopriate amount of RAM, parallel processes, etc.  In any case, please note that running all of the experiments and steps from beginning to end will take a least a few weeks of compute time.
+All of this code was designed to be run on a server with 64 GB of ram, 12 CPU cores, an NVIDIA GTX 980 Ti GPU, and plenty of hard drive space.  If your own setup has less resources, you may need to modify some of the scripts in various places so that they use an appropriate amount of RAM, parallel processes, etc.  In any case, please note that running all of the experiments and steps from beginning to end will take a least a few weeks of compute time.
 
 ### Process
 
